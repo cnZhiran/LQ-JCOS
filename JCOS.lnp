@@ -1,0 +1,6 @@
+"main.obj",
+"ds1302.obj",
+"iic.obj",
+"onewire.obj" 
+TO "JCOS" 
+RAMSIZE(256) 
