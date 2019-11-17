@@ -23,7 +23,7 @@ u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 bit temp_flag=0,len_flag=0,break_flag=0,echo_flag=0,tx_flag=0;
 bit temp_mod=0;len_mod=1;
 u8 dis[8]={0},tx_buf[16]="\0",rx_buf[16]="\0";
-u8 key_flag=0,tx_pot=0,rx_pot=0;
+u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
 u16 temp_timing=0,len_timing=250;
 u16 count=0,len=20,key_count=0;
 int temp=20;
@@ -142,11 +142,12 @@ void init(){
 	Uart_init();
 }
 /*************************************************
-*函数：loop()快速I/O操作函数
+*函数：loop()快速响应函数
 *功能：快速I/O设备的驱动服务，模式变换服务
 *备注：要求函数进行一次的时长要尽可能的短，这样不会影响其他函数的延时等待函数。
 *************************************************/
 void loop(){
+	key_sign=scankey();
 	mod_ctrl();
 	dis_smg();
 }
@@ -164,11 +165,8 @@ void soft_IT(){
 *功能：模式变换服务
 *************************************************/
 void mod_ctrl(){
-	u8 key;
-
-	key=scankey();
 	if(temp_mod){
-		if(key==12){
+		if(key_sign==12){
 			temp_mod=0;
 			len_mod=1;
 			dis[0]=0xc7;
@@ -192,7 +190,7 @@ void mod_ctrl(){
 		}
 	}
 	if(len_mod){
-		if(key==12){	   
+		if(key_sign==12){	   
 			len_mod=0;
 			temp_mod=1;
 			dis[0]=0xc6;
