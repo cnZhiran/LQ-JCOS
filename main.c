@@ -1,6 +1,9 @@
 #include <STC15F2K60S2.H>
 #include <intrins.h>
+#include <string.h>
+#include <stdio.h>
 #include <onewire.h>
+#include <iic.h>
 
 #ifndef u8
 #define u8 unsigned char
@@ -33,6 +36,7 @@ void mod_ctrl();
 void read_temp();
 void read_len();
 u8 scankey();
+void send_str();
 void dis_smg();
 
 /*************************************************
@@ -102,6 +106,8 @@ void Uart_init(void)		//4800bps@12.000MHz
 	TL1 = 0x8F;			//设定定时初值
 	TH1 = 0xFD;			//设定定时初值
 	ET1 = 0;			//禁止定时器1中断
+	ES = 1;
+	EA = 1;
 	TR1 = 1;			//启动定时器1
 }
 /*************************************************
@@ -231,6 +237,7 @@ void read_temp(){
 		dis[7]=font[temp%10];
 	}
 	temp_flag=0;
+
 }	
 /*************************************************
 *函数：read_len()读距离函数
@@ -270,6 +277,15 @@ void read_len(){
 	break_flag = 0;
 	echo_flag = 0;
 	len_flag = 0;
+} 
+/*************************************************
+*函数：send_str()发送字符串函数
+*功能：向串口发送字符串
+*************************************************/
+void send_str(){
+	tx_flag = 1;
+	tx_pot = 0;
+    SBUF = tx_buf[tx_pot++];		//写数据到UART数据寄存器
 }
 /*************************************************
 *函数：scankey()扫描按键函数
@@ -349,22 +365,34 @@ void main(){
 *************************************************/
 void Uart() interrupt 4	using 2
 {
-    if (RI)
-    {
+    if (RI){
         RI = 0;                 //清除RI位
         rx_buf[rx_pot] = SBUF;//存串口数据
-		if(rx_buf[rx_pot]=='\n'){
-			rx_pot=0;
-		}else{
+		if(rx_buf[rx_pot]=='?'){
+			rx_pot = 0;
+		}else if(rx_buf[rx_pot]=='\n'){
+			rx_buf[++rx_pot] ='\0';
 			rx_pot++;
+					
+			//请尽量在此处添加接收串口字符串的函数
+			if(strcmp(rx_buf,"temp\r\n")==0){ 
+				while(tx_flag) loop();
+				sprintf(tx_buf,"temp:%.2f\n",temp/100.0);
+				send_str();
+			}
+			rx_pot = 0; 
+			
+		}else{
+			if(++rx_pot>=15) rx_pot = 0;
 		}
     }
-    if (TI)
-    {
+    if (TI){
         TI = 0;                 //清除TI位
         if(tx_buf[tx_pot]){
-    		SBUF = tx_buf[tx_pot++];                 //写数据到UART数据寄存器
+    		SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
+			if(++tx_pot>=15) tx_pot=0;
 		}else{
+			tx_pot = 0;
 			tx_flag = 0;
 		}
     }
