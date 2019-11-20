@@ -23,7 +23,7 @@ sbit Echo = P1^1;
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
-bit temp_flag=0,len_flag=0,break_flag=0,echo_flag=0,tx_flag=0;
+bit temp_flag=0,len_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
 bit temp_mod=0;len_mod=1;
 u8 dis[8]={0},tx_buf[16]="\0",rx_buf[16]="\0";
 u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
@@ -37,6 +37,7 @@ void read_temp();
 void read_len();
 u8 scankey();
 void send_str();
+void uart_reply();
 void dis_smg();
 
 /*************************************************
@@ -165,6 +166,7 @@ void soft_IT(){
 	
 	if(temp_flag) read_temp();
 	if(len_flag) read_len();
+	if(rx_flag) uart_reply();
 }
 /*************************************************
 *函数：mod_ctrl()模式变换函数
@@ -286,6 +288,22 @@ void send_str(){
 	tx_flag = 1;
 	tx_pot = 0;
     SBUF = tx_buf[tx_pot++];		//写数据到UART数据寄存器
+} 
+/*************************************************
+*函数：uart_reply()串口响应函数
+*功能：串口响应接收字符串
+*************************************************/
+void uart_reply(){
+		rx_flag = 0;
+		if(strcmp(rx_buf,"temp\r\n")==0){
+			while(tx_flag) loop();
+			sprintf(tx_buf,"temp:%.2f\r\n",temp/100.0);
+			send_str();
+		}else if(strcmp(rx_buf,"len\r\n")==0){
+			while(tx_flag) loop();
+			sprintf(tx_buf,"len:%.1f\r\n",len/10.0);
+			send_str();
+		}
 }
 /*************************************************
 *函数：scankey()扫描按键函数
@@ -372,14 +390,15 @@ void Uart() interrupt 4	using 2
 			rx_pot = 0;
 		}else if(rx_buf[rx_pot]=='\n'){
 			rx_buf[++rx_pot] ='\0';
-			rx_pot++;
+			rx_flag = 1;
+//			rx_pot++;
 					
-			//请尽量在此处添加接收串口字符串的函数
-			if(strcmp(rx_buf,"temp\r\n")==0){ 
-				while(tx_flag) loop();
-				sprintf(tx_buf,"temp:%.2f\n",temp/100.0);
-				send_str();
-			}
+//			//请尽量在此处添加接收串口字符串的函数
+//			if(strcmp(rx_buf,"temp\r\n")==0){ 
+//				while(tx_flag) loop();
+//				sprintf(tx_buf,"temp:%.2f\n",temp/100.0);
+//				send_str();
+//			}
 			rx_pot = 0; 
 			
 		}else{
