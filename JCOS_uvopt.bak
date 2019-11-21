@@ -25,7 +25,7 @@
     <ToolsetNumber>0x0</ToolsetNumber>
     <ToolsetName>MCS-51</ToolsetName>
     <TargetOption>
-      <CLK51>35000000</CLK51>
+      <CLK51>12000000</CLK51>
       <OPTTT>
         <gFlags>1</gFlags>
         <BeepAtEnd>1</BeepAtEnd>
@@ -160,10 +160,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>8</ColumnNumber>
+      <ColumnNumber>23</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>374</TopLine>
-      <CurrentLine>386</CurrentLine>
+      <TopLine>1</TopLine>
+      <CurrentLine>1</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -220,9 +220,9 @@
   </Group>
 
   <AlienFiles>
-    <PathWithFilename>C:\Keil\C51\INC\string.h</PathWithFilename>
-    <TopLine>1</TopLine>
-    <CurrentLine>21</CurrentLine>
+    <PathWithFilename>C:\KEIL\C51\INC\STDIO.H</PathWithFilename>
+    <TopLine>11</TopLine>
+    <CurrentLine>32</CurrentLine>
     <Constant>0</Constant>
     <WindowPosition>
       <length>0</length>
@@ -246,9 +246,9 @@
   </AlienFiles>
 
   <AlienFiles>
-    <PathWithFilename>C:\Keil\C51\INC\stdio.h</PathWithFilename>
-    <TopLine>11</TopLine>
-    <CurrentLine>32</CurrentLine>
+    <PathWithFilename>C:\KEIL\C51\INC\STRING.H</PathWithFilename>
+    <TopLine>1</TopLine>
+    <CurrentLine>21</CurrentLine>
     <Constant>0</Constant>
     <WindowPosition>
       <length>0</length>
@@ -1616,9 +1616,9 @@
       <Documents>
         <Doc>
           <Name>.\main.c</Name>
-          <ColumnNumber>8</ColumnNumber>
-          <TopLine>374</TopLine>
-          <CurrentLine>386</CurrentLine>
+          <ColumnNumber>23</ColumnNumber>
+          <TopLine>1</TopLine>
+          <CurrentLine>1</CurrentLine>
         </Doc>
         <Doc>
           <Name>C:\KEIL\C51\INC\STRING.H</Name>
