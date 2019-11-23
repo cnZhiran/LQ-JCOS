@@ -24,7 +24,7 @@ u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 bit temp_flag=0,len_flag=0,vol_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-bit temp_mod=0;len_mod=1,vol_mod=0;
+bit temp_mod=0;len_mod=1,vol_mod=0,bright_mod=0;
 u8 dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
 u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
 u16 temp_timing=0,vol_timing=125,len_timing=250;
@@ -326,6 +326,29 @@ void read_vol(){
 	IIC_Stop();
 
 	if(vol_mod){
+		dis[5]=font[vol/100%10]&0x7f;
+		dis[6]=font[vol/10%10];
+		dis[7]=font[vol%10];
+	}
+}
+/*************************************************
+*函数：read_bright()读亮度函数
+*功能：读取光敏电阻电压
+*************************************************/
+void read_bright(){
+	IIC_Start();
+	IIC_SendByte(0x90);
+	IIC_WaitAck();
+	IIC_SendByte(0x01);
+	IIC_WaitAck();
+	IIC_Start();
+	IIC_SendByte(0x91);
+	IIC_WaitAck();
+	vol=IIC_RecByte();
+	vol=vol*500.0/255;
+	IIC_Stop();
+
+	if(bright_mod){
 		dis[5]=font[vol/100%10]&0x7f;
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
