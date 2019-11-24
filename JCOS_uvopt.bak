@@ -160,10 +160,10 @@
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <Focus>0</Focus>
-      <ColumnNumber>31</ColumnNumber>
+      <ColumnNumber>48</ColumnNumber>
       <tvExpOptDlg>0</tvExpOptDlg>
-      <TopLine>268</TopLine>
-      <CurrentLine>268</CurrentLine>
+      <TopLine>1</TopLine>
+      <CurrentLine>27</CurrentLine>
       <bDave2>0</bDave2>
       <PathWithFileName>.\main.c</PathWithFileName>
       <FilenameWithoutPath>main.c</FilenameWithoutPath>
@@ -1616,9 +1616,9 @@
       <Documents>
         <Doc>
           <Name>.\main.c</Name>
-          <ColumnNumber>31</ColumnNumber>
-          <TopLine>268</TopLine>
-          <CurrentLine>268</CurrentLine>
+          <ColumnNumber>48</ColumnNumber>
+          <TopLine>1</TopLine>
+          <CurrentLine>27</CurrentLine>
         </Doc>
         <Doc>
           <Name>C:\KEIL\C51\INC\STRING.H</Name>
