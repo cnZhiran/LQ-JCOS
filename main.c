@@ -17,18 +17,22 @@
 #define u32 unsigned long
 #endif
 
+#define temp_mod 0
+#define len_mod 1
+#define vol_mod 2
+#define bright_mod 3
+
 sbit Trig = P1^0;
 sbit Echo = P1^1;
 
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
-bit temp_flag=0,len_flag=0,vol_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-bit temp_mod=0;len_mod=1,vol_mod=0,bright_mod=0;
-u8 dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
+bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
+u8 mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
 u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
-u16 temp_timing=0,vol_timing=125,len_timing=250;
-u16 count=0,len=20,vol=250,key_count=0;
+u16 temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
+u16 count=0,len=20,vol=250,bright=250,key_count=0;
 int temp=20;
 
 void mod_init();
@@ -36,6 +40,7 @@ void mod_ctrl();
 void read_temp();
 void read_len();
 void read_vol();
+void read_bright();
 u8 scankey();
 void send_str();
 void uart_reply();
@@ -46,23 +51,32 @@ void dis_smg();
 *功能：系统模式初始化
 *************************************************/
 void mod_init(){
-	if(temp_mod){
+	switch(mod_flag){
+	case temp_mod:
 		dis[0]=0xc6;
 		dis[1]=0xff;
 		dis[2]=0xff;
 		dis[3]=0xff;
 		return;
-	}else if(len_mod){
+	case len_mod:
 		dis[0]=0xc7;
 		dis[1]=0xff;
 		dis[2]=0xff;
 		return;
-	}else if(vol_mod){
+	case vol_mod:
 		dis[0]=0xc1;
 		dis[1]=0xff;
 		dis[2]=0xff;
 		dis[3]=0xff;
 		dis[4]=0xff;
+		return;
+	case bright_mod:
+		dis[0]=0x83;
+		dis[1]=0xff;
+		dis[2]=0xff;
+		dis[3]=0xff;
+		dis[4]=0xff;
+		return;
 	}
 }
 /*************************************************
@@ -174,6 +188,7 @@ void soft_IT(){
 	
 	if(temp_flag) read_temp();
 	if(vol_flag) read_vol();
+	if(bright_flag) read_bright();
 	if(len_flag) read_len();
 	if(rx_flag) uart_reply();
 }
@@ -185,9 +200,7 @@ void mod_ctrl(){
 	u8 i;
 
 	if(key_sign==4){
-		temp_mod=0;
-		vol_mod=0;
-		len_mod=1;
+		mod_flag=len_mod;
 		dis[0]=0xc7;
 		dis[1]=0xff;
 		dis[2]=0xff;
@@ -208,10 +221,8 @@ void mod_ctrl(){
 		}
 		return;
 	}
-	if(key_sign==5){	   
-		len_mod=0;
-		vol_mod=0;
-		temp_mod=1;
+	if(key_sign==5){
+		mod_flag=temp_mod;
 		dis[0]=0xc6;
 		dis[1]=0xff;
 		dis[2]=0xff;
@@ -224,10 +235,8 @@ void mod_ctrl(){
 		if(temp<0) dis[i-2]=0xbf;
 		return;
 	}
-	if(key_sign==8){
-		len_mod=0;
-		temp_mod=0;
-		vol_mod=1;
+	if(key_sign==8){;
+		mod_flag=vol_mod;
 		dis[0]=0xc1;
 		dis[1]=0xff;
 		dis[2]=0xff;
@@ -236,6 +245,17 @@ void mod_ctrl(){
 		dis[5]=font[vol/100%10]&0x7f;
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
+	}
+	if(key_sign==9){
+		mod_flag=bright_mod;
+		dis[0]=0x83;
+		dis[1]=0xff;
+		dis[2]=0xff;
+		dis[3]=0xff;
+		dis[4]=0xff;
+		dis[5]=font[bright/100%10]&0x7f;
+		dis[6]=font[bright/10%10];
+		dis[7]=font[bright%10];
 	}
 }
 /*************************************************
@@ -257,7 +277,7 @@ void read_temp(){
 	tp=(th<<8)|tl;
 	temp=tp*6.25;
 
-	if(temp_mod){
+	if(mod_flag==temp_mod){
 		dis[4]=font[temp/1000%10];
 		dis[5]=font[temp/100%10]&0x7f;
 		dis[6]=font[temp/10%10];
@@ -285,15 +305,18 @@ void read_len(){
     CCF0 = 0;
 	CCAPM0 |= 0x01;					//开启中断
 	while(echo_flag!=0&&break_flag!=0)loop();
-	if(len_mod){
-		if(break_flag){
+	if(break_flag){
+		len=999.9;
+		if(mod_flag==len_mod){
 			dis[3]=font[9];
 			dis[4]=font[9];
 			dis[5]=font[9];
 			dis[6]=font[9]&0x7f;
 			dis[7]=font[9];
-		}else{
-			len=count*0.17;
+		}
+	}else{
+		len=count*0.17;
+		if(mod_flag==len_mod){
 			dis[3]=font[len/10000];
 			dis[4]=font[len/1000%10];
 			dis[5]=font[len/100%10];
@@ -301,8 +324,6 @@ void read_len(){
 			dis[7]=font[len%10];
 			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
 		}
-	}else{
-		len=count*0.17;
 	}
 	break_flag = 0;
 	echo_flag = 0;
@@ -321,11 +342,13 @@ void read_vol(){
 	IIC_Start();
 	IIC_SendByte(0x91);
 	IIC_WaitAck();
+	IIC_RecByte();
+	IIC_SendAck(0);
 	vol=IIC_RecByte();
 	vol=vol*500.0/255;
 	IIC_Stop();
 
-	if(vol_mod){
+	if(mod_flag==vol_mod){
 		dis[5]=font[vol/100%10]&0x7f;
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
@@ -344,14 +367,16 @@ void read_bright(){
 	IIC_Start();
 	IIC_SendByte(0x91);
 	IIC_WaitAck();
-	vol=IIC_RecByte();
-	vol=vol*500.0/255;
+	IIC_RecByte();
+	IIC_SendAck(0);
+	bright=IIC_RecByte();
+	bright=bright*500.0/255;
 	IIC_Stop();
 
-	if(bright_mod){
-		dis[5]=font[vol/100%10]&0x7f;
-		dis[6]=font[vol/10%10];
-		dis[7]=font[vol%10];
+	if(mod_flag==bright_mod){
+		dis[5]=font[bright/100%10]&0x7f;
+		dis[6]=font[bright/10%10];
+		dis[7]=font[bright%10];
 	}
 } 
 /*************************************************
@@ -368,20 +393,20 @@ void send_str(){
 *功能：串口响应接收字符串
 *************************************************/
 void uart_reply(){
-		rx_flag = 0;
-		if(strcmp(rx_buf,"temp\r\n")==0){
-			while(tx_flag) loop();
-			sprintf(tx_buf,"temp:%.2f'C\r\n",temp/100.0);
-			send_str();
-		}else if(strcmp(rx_buf,"len\r\n")==0){
-			while(tx_flag) loop();
-			sprintf(tx_buf,"len:%.1fcm\r\n",len/10.0);
-			send_str();
-		}else if(strcmp(rx_buf,"vol\r\n")==0){
-			while(tx_flag) loop();
-			sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
-			send_str();
-		}
+	rx_flag = 0;
+	if(strcmp(rx_buf,"temp\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"temp:%.2f'C\r\n",temp/100.0);
+		send_str();
+	}else if(strcmp(rx_buf,"len\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"len:%.1fcm\r\n",len/10.0);
+		send_str();
+	}else if(strcmp(rx_buf,"vol\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
+		send_str();
+	}
 }
 /*************************************************
 *函数：scankey()扫描按键函数
@@ -524,6 +549,10 @@ void PCA_isr() interrupt 7 using 3
 *************************************************/
 void Sysclk_IT() interrupt 12 using 3
 {
+	//毫秒级延时服务
+	if(delay_timing){
+		delay_timing--;
+	}
 	//18B20定时读取
 	if(temp_timing){
 		temp_timing--;
@@ -544,6 +573,13 @@ void Sysclk_IT() interrupt 12 using 3
 	}else{
 		vol_timing=500;
 		vol_flag=1;
+	}
+	//光敏电阻定时读取
+	if(bright_timing){
+		bright_timing--;
+	}else{
+		bright_timing=500;
+		bright_flag=1;
 	}
 	//按键时长计数
 	if(key_count){
