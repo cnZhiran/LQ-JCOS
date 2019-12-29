@@ -22,18 +22,29 @@
 #define vol_mod 2
 #define bright_mod 3
 
+
 sbit Trig = P1^0;
 sbit Echo = P1^1;
 
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
+u8 bdata led=0;
 bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
 u8 mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
 u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
 u16 temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
 u16 count=0,len=20,vol=250,bright=250,key_count=0;
 int temp=20;
+
+sbit l1=led^0;
+sbit l2=led^1;
+sbit l3=led^2;
+sbit l4=led^3;
+sbit l5=led^4;
+sbit l6=led^5;
+sbit l7=led^6;
+sbit l8=led^7;
 
 void mod_init();
 void mod_ctrl();
@@ -45,6 +56,7 @@ u8 scankey();
 void send_str();
 void uart_reply();
 void dis_smg();
+void dis_led();
 
 /*************************************************
 *函数：mod_init()系统模式初始化函数
@@ -179,6 +191,7 @@ void loop(){
 	key_sign=scankey();
 	mod_ctrl();
 	dis_smg();
+	dis_led();
 }
 /*************************************************
 *函数：soft_IT()中断捕获和处理函数
@@ -266,6 +279,7 @@ void read_temp(){
 	int tp;
 	u8 tl,th;
 
+	l1=1;
 	while(init_ds18b20())loop();
 	Write_DS18B20(0xCC);
 	Write_DS18B20(0x44);
@@ -284,6 +298,7 @@ void read_temp(){
 		dis[7]=font[temp%10];
 	}
 	temp_flag=0;
+	l1=0;
 
 }	
 /*************************************************
@@ -292,7 +307,8 @@ void read_temp(){
 *************************************************/
 void read_len(){
 	u8 i=8;
-			  
+	
+	l2=1;
 	//发送
 	while(i--){
 		Trig = 1;
@@ -328,12 +344,14 @@ void read_len(){
 	break_flag = 0;
 	echo_flag = 0;
 	len_flag = 0;
+	l2=0;
 }
 /*************************************************
 *函数：read_vol()读电位器函数
 *功能：读取电位器电压
 *************************************************/
 void read_vol(){
+	l3=1;
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
@@ -353,12 +371,14 @@ void read_vol(){
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
 	}
+	l3=0;
 }
 /*************************************************
 *函数：read_bright()读亮度函数
 *功能：读取光敏电阻电压
 *************************************************/
 void read_bright(){
+	l4=1;
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
@@ -378,6 +398,7 @@ void read_bright(){
 		dis[6]=font[bright/10%10];
 		dis[7]=font[bright%10];
 	}
+	l4=0;
 } 
 /*************************************************
 *函数：send_str()发送字符串函数
@@ -393,6 +414,7 @@ void send_str(){
 *功能：串口响应接收字符串
 *************************************************/
 void uart_reply(){
+	l5=1;
 	rx_flag = 0;
 	if(strcmp(rx_buf,"temp\r\n")==0){
 		while(tx_flag) loop();
@@ -407,6 +429,7 @@ void uart_reply(){
 		sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
 		send_str();
 	}
+	l5=0;
 }
 /*************************************************
 *函数：scankey()扫描按键函数
@@ -470,6 +493,16 @@ void dis_smg(){
 	}
 }
 /*************************************************
+*函数：dis_led()LED显示函数
+*功能：驱动显示LED
+*************************************************/
+void dis_led(){
+	P2&=0x1f;
+	P0=~led;
+	P2|=y4;
+	P2&=0x1f;
+}
+/*************************************************
 *函数：main()系统进入函数
 *功能：系统进入初始化服务，系统进行服务
 *************************************************/
@@ -491,29 +524,28 @@ void main(){
 void Uart() interrupt 4	using 2
 {
     if (RI){
-        RI = 0;                 //清除RI位
-        rx_buf[rx_pot] = SBUF;//存串口数据
-		if(rx_buf[rx_pot]=='?'){
-			rx_pot = 0;
-		}else if(rx_buf[rx_pot]=='\n'){
-			rx_buf[++rx_pot] ='\0';
-			rx_flag = 1;
-			rx_pot = 0; 
-			
-		}else{
-			if(++rx_pot>=15) rx_pot = 0;
-		}
+			RI = 0;                 //清除RI位
+			rx_buf[rx_pot] = SBUF;//存串口数据
+			if(rx_buf[rx_pot]=='?'){
+				rx_pot = 0;
+			}else if(rx_buf[rx_pot]=='\n'){
+				rx_buf[++rx_pot] ='\0';
+				rx_flag = 1;
+				rx_pot = 0; 	
+			}else{
+				if(++rx_pot>=15) rx_pot = 0;
+			}
     }
     if (TI){
-        TI = 0;                 //清除TI位
-        if(tx_buf[tx_pot]){
+			TI = 0;                 //清除TI位
+			if(tx_buf[tx_pot]){
     		SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
 			if(++tx_pot>=15) tx_pot=0;
 		}else{
 			tx_pot = 0;
 			tx_flag = 0;
 		}
-    }
+	}
 }
 /*************************************************
 *函数：PCA_isr()PCA定时器中断处理函数
