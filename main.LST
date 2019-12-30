@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 1   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
@@ -40,9 +40,9 @@ line level    source
   31          
   32          u8 bdata led=0;
   33          bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-  34          u8 mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
-  35          u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
-  36          u16 temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
+  34          u8 idata mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
+  35          u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
+  36          u16 idata temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
   37          u16 count=0,len=20,vol=250,bright=250,key_count=0;
   38          int temp=20;
   39          
@@ -62,7 +62,7 @@ line level    source
   53          void read_vol();
   54          void read_bright();
   55          u8 scankey();
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 2   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 2   
 
   56          void send_str();
   57          void uart_reply();
@@ -126,7 +126,7 @@ line level    source
  115   1                                          //PCA定时器停止
  116   1                                          //清除CF标志
  117   1                                          //清除模块中断标志
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 3   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 3   
 
  118   1          CL = 0;                         //复位PCA寄存器
  119   1          CH = 0;
@@ -190,7 +190,7 @@ line level    source
  177          void init(){
  178   1        mod_init();
  179   1        Trig = 0;
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 4   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 4   
 
  180   1        Echo = 1;
  181   1        PCA_init();
@@ -254,7 +254,7 @@ line level    source
  239   2          dis[0]=0xc6;
  240   2          dis[1]=0xff;
  241   2          dis[2]=0xff;
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 5   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 5   
 
  242   2          dis[3]=0xff;
  243   2          dis[4]=font[temp/1000%10];
@@ -318,7 +318,7 @@ line level    source
  301   1        l1=0;
  302   1      
  303   1      } 
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 6   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 6   
 
  304          /*************************************************
  305          *函数：read_len()读距离函数
@@ -382,7 +382,7 @@ line level    source
  363   1        IIC_RecByte();
  364   1        IIC_SendAck(0);
  365   1        vol=IIC_RecByte();
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 7   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 7   
 
  366   1        vol=vol*500.0/255;
  367   1        IIC_Stop();
@@ -446,7 +446,7 @@ line level    source
  425   2          sprintf(tx_buf,"len:%.1fcm\r\n",len/10.0);
  426   2          send_str();
  427   2        }else if(strcmp(rx_buf,"vol\r\n")==0){
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 8   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 8   
 
  428   2          while(tx_flag) loop();
  429   2          sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
@@ -510,7 +510,7 @@ line level    source
  487   2          _nop_();
  488   2          P2&=0x1f;
  489   2          P0=dis[i];
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 9   
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 9   
 
  490   2          P2|=y7;
  491   2          delay100us();
@@ -574,7 +574,7 @@ line level    source
  549   1      }
  550          /*************************************************
  551          *函数：PCA_isr()PCA定时器中断处理函数
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 10  
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 10  
 
  552          *功能：脉冲时长计数服务
  553          *硬件：使用PCA定时器，规定溢出和P11下降沿中断
@@ -638,7 +638,7 @@ line level    source
  611   2          bright_timing--;
  612   2        }else{
  613   2          bright_timing=500;
-C51 COMPILER V9.59.0.0   MAIN                                                              12/29/2019 13:57:02 PAGE 11  
+C51 COMPILER V9.59.0.0   MAIN                                                              12/30/2019 18:35:10 PAGE 11  
 
  614   2          bright_flag=1;
  615   2        }
@@ -650,12 +650,12 @@ line level    source
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   3245    ----
+   CODE SIZE        =   2982    ----
    CONSTANT SIZE    =     72    ----
-   XDATA SIZE       =     67       3
+   XDATA SIZE       =     12       3
    PDATA SIZE       =   ----    ----
    DATA SIZE        =      1    ----
-   IDATA SIZE       =   ----    ----
+   IDATA SIZE       =     55    ----
    BIT SIZE         =      8    ----
 END OF MODULE INFORMATION.
 

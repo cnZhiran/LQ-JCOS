@@ -31,9 +31,9 @@ u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 u8 bdata led=0;
 bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-u8 mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n>>>",rx_buf[16]="\0";
-u8 key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
-u16 temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
+u8 idata mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
+u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
+u16 idata temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
 u16 count=0,len=20,vol=250,bright=250,key_count=0;
 int temp=20;
 
