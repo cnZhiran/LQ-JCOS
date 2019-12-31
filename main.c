@@ -29,7 +29,7 @@ sbit Echo = P1^1;
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
-u8 bdata led=0;
+u8 bdata led=0,out=0;
 bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
 u8 idata mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
@@ -45,6 +45,8 @@ sbit l5=led^4;
 sbit l6=led^5;
 sbit l7=led^6;
 sbit l8=led^7;
+sbit relay=out^4;
+sbit buzz=out^6;
 
 void mod_init();
 void mod_ctrl();
@@ -57,6 +59,7 @@ void send_str();
 void uart_reply();
 void dis_smg();
 void dis_led();
+void dis_out();
 
 /*************************************************
 *函数：mod_init()系统模式初始化函数
@@ -100,8 +103,8 @@ void Sysclk_init(){
 	AUXR |= 0x04;		//定时器2时钟1T模式
 	T2L = 0x20;			//设置定时初值
 	T2H = 0xD1;			//设置定时初值
-    IE2 |= 0x04;		//开定时器2中断
-    EA = 1;
+	IE2 |= 0x04;		//开定时器2中断
+	EA = 1;
 	AUXR |= 0x10;		//定时器2开始计时
 }
 /*************************************************
@@ -192,6 +195,7 @@ void loop(){
 	mod_ctrl();
 	dis_smg();
 	dis_led();
+	dis_out();
 }
 /*************************************************
 *函数：soft_IT()中断捕获和处理函数
@@ -371,6 +375,11 @@ void read_vol(){
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
 	}
+	if(vol>300){
+		buzz=1;
+	}else{
+		buzz=0;
+	}
 	l3=0;
 }
 /*************************************************
@@ -398,6 +407,11 @@ void read_bright(){
 		dis[6]=font[bright/10%10];
 		dis[7]=font[bright%10];
 	}
+	if(bright>300){
+		relay=1;
+	}else{
+		relay=0;
+	}
 	l4=0;
 } 
 /*************************************************
@@ -407,7 +421,7 @@ void read_bright(){
 void send_str(){
 	tx_flag = 1;
 	tx_pot = 0;
-    SBUF = tx_buf[tx_pot++];		//写数据到UART数据寄存器
+	SBUF = tx_buf[tx_pot++];		//写数据到UART数据寄存器
 } 
 /*************************************************
 *函数：uart_reply()串口响应函数
@@ -427,6 +441,10 @@ void uart_reply(){
 	}else if(strcmp(rx_buf,"vol\r\n")==0){
 		while(tx_flag) loop();
 		sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
+		send_str();
+	}else if(strcmp(rx_buf,"bright\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"bright:%.2fV\r\n",bright/100.0);
 		send_str();
 	}
 	l5=0;
@@ -500,6 +518,16 @@ void dis_led(){
 	P2&=0x1f;
 	P0=~led;
 	P2|=y4;
+	P2&=0x1f;
+}
+/*************************************************
+*函数：dis_out()OUT显示函数
+*功能：驱动显示OUT
+*************************************************/
+void dis_out(){
+	P2&=0x1f;
+	P0=out;
+	P2|=y5;
 	P2&=0x1f;
 }
 /*************************************************
