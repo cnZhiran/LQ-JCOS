@@ -457,8 +457,8 @@ u8 scankey(){
 	u8 key;
 
 	P4=0xff;P3=0xff;P3&=0xf3;
-	if(P34==0|P35==0|P42==0|P44==0){
-		delay100us();
+//	if(P34==0|P35==0|P42==0|P44==0){
+//		delay100us();
 		if(P34==0|P35==0|P42==0|P44==0){
 			if(key_count==0){
 				key_count = 1;
@@ -479,12 +479,12 @@ u8 scankey(){
 			}
 			return 0;
 		}	
-	}
+//	}
 	if(key_count){
 		if(key_count<1000){
 			key_count=0;
 			return key_flag;
-		}else{
+		}else if(key_count>2){
 			key_count=0;
 			return key_flag+10;
 		}

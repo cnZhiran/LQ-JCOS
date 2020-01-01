@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 1   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
@@ -62,7 +62,7 @@ line level    source
   53          void read_temp();
   54          void read_len();
   55          void read_vol();
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 2   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 2   
 
   56          void read_bright();
   57          u8 scankey();
@@ -126,7 +126,7 @@ line level    source
  115          void PCA_init(){
  116   1        P_SW1 &= 0xcf;    //(P1.2/ECI, P1.1/CCP0, P1.0/CCP1, P3.7/CCP2)
  117   1          CCON = 0;                       //初始化PCA控制寄存器
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 3   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 3   
 
  118   1                                          //PCA定时器停止
  119   1                                          //清除CF标志
@@ -190,7 +190,7 @@ line level    source
  177          *函数：init()初始化函数
  178          *功能：系统进入的初始化服务
  179          *************************************************/
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 4   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 4   
 
  180          void init(){
  181   1        mod_init();
@@ -254,7 +254,7 @@ line level    source
  239   2          return;
  240   2        }
  241   1        if(key_sign==5){
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 5   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 5   
 
  242   2          mod_flag=temp_mod;
  243   2          dis[0]=0xc6;
@@ -318,7 +318,7 @@ line level    source
  301   2          dis[6]=font[temp/10%10];
  302   2          dis[7]=font[temp%10];
  303   2        }
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 6   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 6   
 
  304   1        temp_flag=0;
  305   1        l1=0;
@@ -382,7 +382,7 @@ line level    source
  363   1        IIC_WaitAck();
  364   1        IIC_Start();
  365   1        IIC_SendByte(0x91);
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 7   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 7   
 
  366   1        IIC_WaitAck();
  367   1        IIC_RecByte();
@@ -446,7 +446,7 @@ line level    source
  425   1      } 
  426          /*************************************************
  427          *函数：uart_reply()串口响应函数
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 8   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 8   
 
  428          *功能：串口响应接收字符串
  429          *************************************************/
@@ -480,37 +480,37 @@ line level    source
  457   1        u8 key;
  458   1      
  459   1        P4=0xff;P3=0xff;P3&=0xf3;
- 460   1        if(P34==0|P35==0|P42==0|P44==0){
- 461   2          delay100us();
- 462   2          if(P34==0|P35==0|P42==0|P44==0){
- 463   3            if(key_count==0){
- 464   4              key_count = 1;
- 465   4              key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
- 466   4              P3=0xff;P3&=0xcf;P4=0x00;
- 467   4              delay12us();
- 468   4              key |= P3 &0x0c;
- 469   4              switch(key){
- 470   5                case 0x74:key_flag=4;break;
- 471   5                case 0x78:key_flag=5;break;
- 472   5                case 0xb4:key_flag=8;break;
- 473   5                case 0xb8:key_flag=9;break;
- 474   5                case 0xd4:key_flag=12;break;
- 475   5                case 0xd8:key_flag=13;break;
- 476   5                case 0xe4:key_flag=16;break;
- 477   5                case 0xe8:key_flag=17;break;
- 478   5              }
- 479   4            }
- 480   3            return 0;
- 481   3          } 
- 482   2        }
+ 460   1      //  if(P34==0|P35==0|P42==0|P44==0){
+ 461   1      //    delay100us();
+ 462   1          if(P34==0|P35==0|P42==0|P44==0){
+ 463   2            if(key_count==0){
+ 464   3              key_count = 1;
+ 465   3              key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
+ 466   3              P3=0xff;P3&=0xcf;P4=0x00;
+ 467   3              delay12us();
+ 468   3              key |= P3 &0x0c;
+ 469   3              switch(key){
+ 470   4                case 0x74:key_flag=4;break;
+ 471   4                case 0x78:key_flag=5;break;
+ 472   4                case 0xb4:key_flag=8;break;
+ 473   4                case 0xb8:key_flag=9;break;
+ 474   4                case 0xd4:key_flag=12;break;
+ 475   4                case 0xd8:key_flag=13;break;
+ 476   4                case 0xe4:key_flag=16;break;
+ 477   4                case 0xe8:key_flag=17;break;
+ 478   4              }
+ 479   3            }
+ 480   2            return 0;
+ 481   2          } 
+ 482   1      //  }
  483   1        if(key_count){
  484   2          if(key_count<1000){
  485   3            key_count=0;
  486   3            return key_flag;
- 487   3          }else{
+ 487   3          }else if(key_count>2){
  488   3            key_count=0;
  489   3            return key_flag+10;
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 9   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 9   
 
  490   3          }
  491   2        }
@@ -574,7 +574,7 @@ line level    source
  549          *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
  550          *硬件：使用T2定时器，规定1ms溢出中断一次
  551          *************************************************/
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 10  
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 10  
 
  552          void Uart() interrupt 4 using 2
  553          {
@@ -638,7 +638,7 @@ line level    source
  611          {
  612   1        //毫秒级延时服务
  613   1        if(delay_timing){
-C51 COMPILER V9.59.0.0   MAIN                                                              12/31/2019 21:35:25 PAGE 11  
+C51 COMPILER V9.59.0.0   MAIN                                                              01/01/2020 21:36:00 PAGE 11  
 
  614   2          delay_timing--;
  615   2        }
@@ -678,7 +678,7 @@ line level    source
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   3110    ----
+   CODE SIZE        =   3074    ----
    CONSTANT SIZE    =     96    ----
    XDATA SIZE       =     12       3
    PDATA SIZE       =   ----    ----

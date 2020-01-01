@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   IIC                                                               12/31/2019 21:35:25 PAGE 1   
+C51 COMPILER V9.59.0.0   IIC                                                               01/01/2020 21:36:01 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE IIC
@@ -62,7 +62,7 @@ line level    source
   52   1          SCL = 1;
   53   1          IIC_Delay(DELAY_TIME);
   54   1          SCL = 0; 
-C51 COMPILER V9.59.0.0   IIC                                                               12/31/2019 21:35:25 PAGE 2   
+C51 COMPILER V9.59.0.0   IIC                                                               01/01/2020 21:36:01 PAGE 2   
 
   55   1          SDA = 1;
   56   1          IIC_Delay(DELAY_TIME);
@@ -127,7 +127,7 @@ MODULE INFORMATION:   STATIC OVERLAYABLE
    BIT SIZE         =   ----       2
 END OF MODULE INFORMATION.
 
-C51 COMPILER V9.59.0.0   IIC                                                               12/31/2019 21:35:25 PAGE 3   
+C51 COMPILER V9.59.0.0   IIC                                                               01/01/2020 21:36:01 PAGE 3   
 
 
 C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
