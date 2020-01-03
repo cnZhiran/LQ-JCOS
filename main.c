@@ -22,6 +22,8 @@
 #define vol_mod 2
 #define bright_mod 3
 
+#define len_read_IT		//len_read_once一次性读距离，len_read_IT发读分离法读距离
+
 
 sbit Trig = P1^0;
 sbit Echo = P1^1;
@@ -32,9 +34,9 @@ u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 u8 bdata led=0,out=0;
 bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
 u8 idata mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
-u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0;
-u16 idata temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
-u16 count=0,len=20,vol=250,bright=250,key_count=0;
+u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0;
+u16 idata length=0,key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
+u16 len=20,vol=250,bright=250;
 int temp=20;
 
 sbit l1=led^0;
@@ -51,7 +53,12 @@ sbit buzz=out^6;
 void mod_init();
 void mod_ctrl();
 void read_temp();
+#ifdef len_read_once
 void read_len();
+#elif defined len_read_IT 
+void send_len();
+void read_len();
+#endif
 void read_vol();
 void read_bright();
 u8 scankey();
@@ -66,17 +73,39 @@ void dis_out();
 *功能：系统模式初始化
 *************************************************/
 void mod_init(){
+	u8 i;
+	
 	switch(mod_flag){
 	case temp_mod:
 		dis[0]=0xc6;
 		dis[1]=0xff;
 		dis[2]=0xff;
 		dis[3]=0xff;
+		dis[4]=font[temp/1000%10];
+		dis[5]=font[temp/100%10]&0x7f;
+		dis[6]=font[temp/10%10];
+		dis[7]=font[temp%10];
+		for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		if(temp<0) dis[i-2]=0xbf;
 		return;
 	case len_mod:
 		dis[0]=0xc7;
 		dis[1]=0xff;
 		dis[2]=0xff;
+		if(length==0){
+			dis[3]=font[9];
+			dis[4]=font[9];
+			dis[5]=font[9];
+			dis[6]=font[9]&0x7f;
+			dis[7]=font[9];
+		}else{
+			dis[3]=font[len/10000];
+			dis[4]=font[len/1000%10];
+			dis[5]=font[len/100%10];
+			dis[6]=font[len/10%10]&0x7f;
+			dis[7]=font[len%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		}
 		return;
 	case vol_mod:
 		dis[0]=0xc1;
@@ -84,6 +113,9 @@ void mod_init(){
 		dis[2]=0xff;
 		dis[3]=0xff;
 		dis[4]=0xff;
+		dis[5]=font[vol/100%10]&0x7f;
+		dis[6]=font[vol/10%10];
+		dis[7]=font[vol%10];
 		return;
 	case bright_mod:
 		dis[0]=0x83;
@@ -91,6 +123,9 @@ void mod_init(){
 		dis[2]=0xff;
 		dis[3]=0xff;
 		dis[4]=0xff;
+		dis[5]=font[bright/100%10]&0x7f;
+		dis[6]=font[bright/10%10];
+		dis[7]=font[bright%10];
 		return;
 	}
 }
@@ -114,19 +149,15 @@ void Sysclk_init(){
 *************************************************/
 void PCA_init(){
 	P_SW1 &= 0xcf;		//(P1.2/ECI, P1.1/CCP0, P1.0/CCP1, P3.7/CCP2)
-    CCON = 0;                       //初始化PCA控制寄存器
-                                    //PCA定时器停止
-                                    //清除CF标志
-                                    //清除模块中断标志
-    CL = 0;                         //复位PCA寄存器
-    CH = 0;
-    CCAP0L = 0;
-    CCAP0H = 0;
-    CMOD = 0x01;                    //设置PCA时钟源为系统时钟/12,且使能PCA计时溢出中断
-    CCAPM0 = 0x10;					//PCA模块0为16位捕获模式(下降沿捕获,可测从低电平开始的整个周期)
-	
-    EA = 1;
-
+	CCON = 0;                       //初始化PCA控制寄存器
+                                  //PCA定时器停止
+                                  //清除CF标志
+                                  //清除模块中断标志
+  CL = 0;                         //复位PCA寄存器
+  CH = 0;
+  CMOD = 0x01;                    //设置PCA时钟源,允许溢出中断
+  CCAPM0 = 0x11;                  //PCA模块0为下降沿触发,开启中断。
+  EA = 1;
 }
 /*************************************************
 *函数：Uart_init()串口初始化函数
@@ -206,7 +237,12 @@ void soft_IT(){
 	if(temp_flag) read_temp();
 	if(vol_flag) read_vol();
 	if(bright_flag) read_bright();
+	#ifdef len_read_once
 	if(len_flag) read_len();
+	#elif defined len_read_IT
+	if(len_flag) send_len();
+	if(echo_flag||break_flag) read_len();
+	#endif
 	if(rx_flag) uart_reply();
 }
 /*************************************************
@@ -214,66 +250,16 @@ void soft_IT(){
 *功能：模式变换服务
 *************************************************/
 void mod_ctrl(){
-	u8 i;
-
 	if(key_sign==4){
 		mod_flag=len_mod;
-		dis[0]=0xc7;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		if(count==0){
-			dis[3]=font[9];
-			dis[4]=font[9];
-			dis[5]=font[9];
-			dis[6]=font[9]&0x7f;
-			dis[7]=font[9];
-		}else{
-			len=count*0.17;
-			dis[3]=font[len/10000];
-			dis[4]=font[len/1000%10];
-			dis[5]=font[len/100%10];
-			dis[6]=font[len/10%10]&0x7f;
-			dis[7]=font[len%10];
-			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-		}
-		return;
-	}
-	if(key_sign==5){
+	}else if(key_sign==5){
 		mod_flag=temp_mod;
-		dis[0]=0xc6;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=font[temp/1000%10];
-		dis[5]=font[temp/100%10]&0x7f;
-		dis[6]=font[temp/10%10];
-		dis[7]=font[temp%10];
-		for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-		if(temp<0) dis[i-2]=0xbf;
-		return;
-	}
-	if(key_sign==8){;
+	}else if(key_sign==8){;
 		mod_flag=vol_mod;
-		dis[0]=0xc1;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=0xff;
-		dis[5]=font[vol/100%10]&0x7f;
-		dis[6]=font[vol/10%10];
-		dis[7]=font[vol%10];
-	}
-	if(key_sign==9){
+	}else if(key_sign==9){
 		mod_flag=bright_mod;
-		dis[0]=0x83;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=0xff;
-		dis[5]=font[bright/100%10]&0x7f;
-		dis[6]=font[bright/10%10];
-		dis[7]=font[bright%10];
 	}
+	mod_init();
 }
 /*************************************************
 *函数：read_temp()读温度函数
@@ -306,13 +292,16 @@ void read_temp(){
 
 }	
 /*************************************************
-*函数：read_len()读距离函数
+*函数：read_len()一次性读距离函数
 *功能：读取距离
 *************************************************/
+#ifdef len_read_once
 void read_len(){
 	u8 i=8;
 	
-	l2=1;
+	break_flag = 0;
+	echo_flag = 0;
+	len_flag = 0;
 	//发送
 	while(i--){
 		Trig = 1;
@@ -320,13 +309,16 @@ void read_len(){
 		Trig = 0;
 		delay12us();
 	}
-	//接收
-    CR = 1;                         //PCA定时器开始工作
-    CCF0 = 0;
+	CL = 0;
+	CH = 0;
+	CCF0 = 0;
+	CF = 0;
+	CR = 1;                 //PCA定时器开始工作
 	CCAPM0 |= 0x01;					//开启中断
-	while(echo_flag!=0&&break_flag!=0)loop();
+	while(echo_flag==0&&break_flag==0)loop();
+	//接收
 	if(break_flag){
-		len=999.9;
+		len=9999;
 		if(mod_flag==len_mod){
 			dis[3]=font[9];
 			dis[4]=font[9];
@@ -334,8 +326,8 @@ void read_len(){
 			dis[6]=font[9]&0x7f;
 			dis[7]=font[9];
 		}
-	}else{
-		len=count*0.17;
+	}else if(echo_flag){
+		len=length*0.17;
 		if(mod_flag==len_mod){
 			dis[3]=font[len/10000];
 			dis[4]=font[len/1000%10];
@@ -345,11 +337,59 @@ void read_len(){
 			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
 		}
 	}
+}	
+/*************************************************
+*函数：send_len()+read_len()发读分离法读距离函数
+*功能：读取距离
+*************************************************/
+#elif defined len_read_IT
+//发送
+void send_len(){
+	u8 i=8;
+	
 	break_flag = 0;
 	echo_flag = 0;
 	len_flag = 0;
-	l2=0;
+	while(i--){
+		Trig = 1;
+		delay12us();
+		Trig = 0;
+		delay12us();
+	}
+	CL = 0;
+	CH = 0;
+	CCF0 = 0;
+	CF = 0;
+	CR = 1;                 //PCA定时器开始工作
+	CCAPM0 |= 0x01;					//开启中断
 }
+
+//接收
+void read_len(){
+	u8 i;
+	
+	if(echo_flag){
+		len=length*0.17;
+		if(mod_flag==len_mod){
+			dis[3]=font[len/10000];
+			dis[4]=font[len/1000%10];
+			dis[5]=font[len/100%10];
+			dis[6]=font[len/10%10]&0x7f;
+			dis[7]=font[len%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		}
+	}else if(break_flag){
+		len=9999;
+		if(mod_flag==len_mod){
+			dis[3]=font[9];
+			dis[4]=font[9];
+			dis[5]=font[9];
+			dis[6]=font[9]&0x7f;
+			dis[7]=font[9];
+		}
+	}
+}
+#endif
 /*************************************************
 *函数：read_vol()读电位器函数
 *功能：读取电位器电压
@@ -457,29 +497,26 @@ u8 scankey(){
 	u8 key;
 
 	P4=0xff;P3=0xff;P3&=0xf3;
-//	if(P34==0|P35==0|P42==0|P44==0){
-//		delay100us();
-		if(P34==0|P35==0|P42==0|P44==0){
-			if(key_count==0){
-				key_count = 1;
-				key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
-				P3=0xff;P3&=0xcf;P4=0x00;
-				delay12us();
-				key |= P3 &0x0c;
-				switch(key){
-					case 0x74:key_flag=4;break;
-					case 0x78:key_flag=5;break;
-					case 0xb4:key_flag=8;break;
-					case 0xb8:key_flag=9;break;
-					case 0xd4:key_flag=12;break;
-					case 0xd8:key_flag=13;break;
-					case 0xe4:key_flag=16;break;
-					case 0xe8:key_flag=17;break;
-				}
+	if(P34==0|P35==0|P42==0|P44==0){
+		if(key_count==0){
+			key_count = 1;
+			key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
+			P3=0xff;P3&=0xcf;P4=0x00;
+			delay12us();
+			key |= P3 &0x0c;
+			switch(key){
+				case 0x74:key_flag=4;break;
+				case 0x78:key_flag=5;break;
+				case 0xb4:key_flag=8;break;
+				case 0xb8:key_flag=9;break;
+				case 0xd4:key_flag=12;break;
+				case 0xd8:key_flag=13;break;
+				case 0xe4:key_flag=16;break;
+				case 0xe8:key_flag=17;break;
 			}
-			return 0;
-		}	
-//	}
+		}
+		return 0;
+	}	
 	if(key_count){
 		if(key_count<1000){
 			key_count=0;
@@ -583,24 +620,19 @@ void Uart() interrupt 4	using 2
 *************************************************/
 void PCA_isr() interrupt 7 using 3
 {	
-    if (CF)
-    {
-        CF = 0;						//定时器溢出中断
-        break_flag=1;
-    }
-    if (CCF0)
-    {
+	if (CCF0){
 		CCF0 = 0;
+		length = (CCAP0H<<8)|CCAP0L;  //保存本次的捕获值
 		echo_flag = 1;
-		count=(CCAP0H<<8)|CCAP0L;	//保存本次的捕获值
-		CCAPM0 &= 0xfe;				//关闭中断
-    	CR = 0;						//PCA定时器停止工作
-		CL = 0;                     //复位PCA寄存器
-		CH = 0;
-		CCAP0L = 0;
-		CCAP0H = 0;
-		
-    }
+		CR = 0;		//PCA定时器停止工作
+		CCAPM0 &= 0xfe;
+	}
+	if (CF){
+		CF = 0;
+		break_flag = 1;
+		CR = 0;		//PCA定时器停止工作
+		CCAPM0 &= 0xfe;
+	}
 }
 /*************************************************
 *函数：Sysclk_IT()系统定时中断处理函数
