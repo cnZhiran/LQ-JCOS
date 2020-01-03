@@ -73,17 +73,39 @@ void dis_out();
 *功能：系统模式初始化
 *************************************************/
 void mod_init(){
+	u8 i;
+	
 	switch(mod_flag){
 	case temp_mod:
 		dis[0]=0xc6;
 		dis[1]=0xff;
 		dis[2]=0xff;
 		dis[3]=0xff;
+		dis[4]=font[temp/1000%10];
+		dis[5]=font[temp/100%10]&0x7f;
+		dis[6]=font[temp/10%10];
+		dis[7]=font[temp%10];
+		for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		if(temp<0) dis[i-2]=0xbf;
 		return;
 	case len_mod:
 		dis[0]=0xc7;
 		dis[1]=0xff;
 		dis[2]=0xff;
+		if(length==0){
+			dis[3]=font[9];
+			dis[4]=font[9];
+			dis[5]=font[9];
+			dis[6]=font[9]&0x7f;
+			dis[7]=font[9];
+		}else{
+			dis[3]=font[len/10000];
+			dis[4]=font[len/1000%10];
+			dis[5]=font[len/100%10];
+			dis[6]=font[len/10%10]&0x7f;
+			dis[7]=font[len%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		}
 		return;
 	case vol_mod:
 		dis[0]=0xc1;
@@ -91,6 +113,9 @@ void mod_init(){
 		dis[2]=0xff;
 		dis[3]=0xff;
 		dis[4]=0xff;
+		dis[5]=font[vol/100%10]&0x7f;
+		dis[6]=font[vol/10%10];
+		dis[7]=font[vol%10];
 		return;
 	case bright_mod:
 		dis[0]=0x83;
@@ -98,6 +123,9 @@ void mod_init(){
 		dis[2]=0xff;
 		dis[3]=0xff;
 		dis[4]=0xff;
+		dis[5]=font[bright/100%10]&0x7f;
+		dis[6]=font[bright/10%10];
+		dis[7]=font[bright%10];
 		return;
 	}
 }
@@ -222,65 +250,16 @@ void soft_IT(){
 *功能：模式变换服务
 *************************************************/
 void mod_ctrl(){
-	u8 i;
-
 	if(key_sign==4){
 		mod_flag=len_mod;
-		dis[0]=0xc7;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		if(length==0){
-			dis[3]=font[9];
-			dis[4]=font[9];
-			dis[5]=font[9];
-			dis[6]=font[9]&0x7f;
-			dis[7]=font[9];
-		}else{
-			dis[3]=font[len/10000];
-			dis[4]=font[len/1000%10];
-			dis[5]=font[len/100%10];
-			dis[6]=font[len/10%10]&0x7f;
-			dis[7]=font[len%10];
-			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-		}
-		return;
-	}
-	if(key_sign==5){
+	}else if(key_sign==5){
 		mod_flag=temp_mod;
-		dis[0]=0xc6;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=font[temp/1000%10];
-		dis[5]=font[temp/100%10]&0x7f;
-		dis[6]=font[temp/10%10];
-		dis[7]=font[temp%10];
-		for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-		if(temp<0) dis[i-2]=0xbf;
-		return;
-	}
-	if(key_sign==8){;
+	}else if(key_sign==8){;
 		mod_flag=vol_mod;
-		dis[0]=0xc1;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=0xff;
-		dis[5]=font[vol/100%10]&0x7f;
-		dis[6]=font[vol/10%10];
-		dis[7]=font[vol%10];
-	}
-	if(key_sign==9){
+	}else if(key_sign==9){
 		mod_flag=bright_mod;
-		dis[0]=0x83;
-		dis[1]=0xff;
-		dis[2]=0xff;
-		dis[3]=0xff;
-		dis[4]=0xff;
-		dis[5]=font[bright/100%10]&0x7f;
-		dis[6]=font[bright/10%10];
-		dis[7]=font[bright%10];
 	}
+	mod_init();
 }
 /*************************************************
 *函数：read_temp()读温度函数
