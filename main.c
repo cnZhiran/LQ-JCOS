@@ -61,7 +61,7 @@ void read_len();
 #endif
 void read_vol();
 void read_bright();
-u8 scankey();
+void scankey();
 void send_str();
 void uart_reply();
 void dis_smg();
@@ -222,7 +222,7 @@ void init(){
 *备注：要求函数进行一次的时长要尽可能的短，这样不会影响其他函数的延时等待函数。
 *************************************************/
 void loop(){
-	key_sign=scankey();
+	scankey();
 	mod_ctrl();
 	dis_smg();
 	dis_led();
@@ -259,6 +259,7 @@ void mod_ctrl(){
 	}else if(key_sign==9){
 		mod_flag=bright_mod;
 	}
+	key_sign = 0;
 	mod_init();
 }
 /*************************************************
@@ -270,6 +271,7 @@ void read_temp(){
 	u8 tl,th;
 
 	l1=1;
+	temp_flag=0;
 	while(init_ds18b20())loop();
 	Write_DS18B20(0xCC);
 	Write_DS18B20(0x44);
@@ -287,7 +289,6 @@ void read_temp(){
 		dis[6]=font[temp/10%10];
 		dis[7]=font[temp%10];
 	}
-	temp_flag=0;
 	l1=0;
 
 }	
@@ -356,9 +357,9 @@ void send_len(){
 		Trig = 0;
 		delay12us();
 	}
-	CL = 0;
+	CL = 0;									//计时器清零
 	CH = 0;
-	CCF0 = 0;
+	CCF0 = 0;								//清标志
 	CF = 0;
 	CR = 1;                 //PCA定时器开始工作
 	CCAPM0 |= 0x01;					//开启中断
@@ -396,6 +397,7 @@ void read_len(){
 *************************************************/
 void read_vol(){
 	l3=1;
+	vol_flag = 0;
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
@@ -428,6 +430,7 @@ void read_vol(){
 *************************************************/
 void read_bright(){
 	l4=1;
+	bright_flag = 0;
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
@@ -493,7 +496,7 @@ void uart_reply(){
 *函数：scankey()扫描按键函数
 *功能：扫描按键
 *************************************************/
-u8 scankey(){
+void scankey(){
 	u8 key;
 
 	P4=0xff;P3=0xff;P3&=0xf3;
@@ -515,18 +518,17 @@ u8 scankey(){
 				case 0xe8:key_flag=17;break;
 			}
 		}
-		return 0;
-	}	
-	if(key_count){
-		if(key_count<1000){
-			key_count=0;
-			return key_flag;
-		}else if(key_count>2){
-			key_count=0;
-			return key_flag+10;
-		}
+		return;
 	}
-	return 0;
+	if(key_count>1000){
+		key_count = 0;
+		key_sign = key_flag +10;
+	}else if(key_count>2){
+		key_count=0;
+		key_sign = key_flag;
+	}else{
+		key_count=0;
+	}
 }
 /*************************************************
 *函数：dis_smg()数码管显示函数
@@ -624,14 +626,14 @@ void PCA_isr() interrupt 7 using 3
 		CCF0 = 0;
 		length = (CCAP0H<<8)|CCAP0L;  //保存本次的捕获值
 		echo_flag = 1;
-		CR = 0;		//PCA定时器停止工作
-		CCAPM0 &= 0xfe;
+		CR = 0;												//PCA定时器停止工作
+		CCAPM0 &= 0xfe;								//关闭中断
 	}
 	if (CF){
 		CF = 0;
 		break_flag = 1;
-		CR = 0;		//PCA定时器停止工作
-		CCAPM0 &= 0xfe;
+		CR = 0;												//PCA定时器停止工作
+		CCAPM0 &= 0xfe;								//关闭中断
 	}
 }
 /*************************************************
@@ -675,6 +677,6 @@ void Sysclk_IT() interrupt 12 using 3
 	}
 	//按键时长计数
 	if(key_count){
-		if(++key_count==0)key_count=1000;
+		if(++key_count==0)key_count=1001;
 	}
 }
