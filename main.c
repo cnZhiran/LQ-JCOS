@@ -33,11 +33,11 @@ u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 u8 bdata led=0,out=0;
 bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-u8 idata mod_flag=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
-u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0;
-u16 idata length=0,key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0;
-u16 len=20,vol=250,bright=250;
-int temp=20;
+u8 idata mod_flag=len_mod,read_mod=len_mod,dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
+u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0;
+u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500;
+u16 *write_addr;
+u16 length=0,temp=-2000,len=20,vol=250,bright=250;
 
 sbit l1=led^0;
 sbit l2=led^1;
@@ -64,6 +64,9 @@ void read_bright();
 void scankey();
 void send_str();
 void uart_reply();
+void eep_write();
+void eep_read();
+
 void dis_smg();
 void dis_led();
 void dis_out();
@@ -81,12 +84,23 @@ void mod_init(){
 		dis[1]=0xff;
 		dis[2]=0xff;
 		dis[3]=0xff;
-		dis[4]=font[temp/1000%10];
-		dis[5]=font[temp/100%10]&0x7f;
-		dis[6]=font[temp/10%10];
-		dis[7]=font[temp%10];
-		for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-		if(temp<0) dis[i-2]=0xbf;
+		if(temp>=0x8000){
+			dis[3]=font[-temp/10000%10];
+			dis[4]=font[-temp/1000%10];
+			dis[5]=font[-temp/100%10]&0x7f;
+			dis[6]=font[-temp/10%10];
+			dis[7]=font[-temp%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+			dis[i-1]=0xbf;
+		}else{
+			dis[3]=font[temp/10000%10];
+			dis[4]=font[temp/1000%10];
+			dis[5]=font[temp/100%10]&0x7f;
+			dis[6]=font[temp/10%10];
+			dis[7]=font[temp%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		}
+		write_addr = &temp;
 		return;
 	case len_mod:
 		dis[0]=0xc7;
@@ -106,6 +120,7 @@ void mod_init(){
 			dis[7]=font[len%10];
 			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
 		}
+		write_addr = &len;
 		return;
 	case vol_mod:
 		dis[0]=0xc1;
@@ -116,6 +131,7 @@ void mod_init(){
 		dis[5]=font[vol/100%10]&0x7f;
 		dis[6]=font[vol/10%10];
 		dis[7]=font[vol%10];
+		write_addr = &vol;
 		return;
 	case bright_mod:
 		dis[0]=0x83;
@@ -126,6 +142,7 @@ void mod_init(){
 		dis[5]=font[bright/100%10]&0x7f;
 		dis[6]=font[bright/10%10];
 		dis[7]=font[bright%10];
+		write_addr = &bright;
 		return;
 	}
 }
@@ -243,6 +260,7 @@ void soft_IT(){
 	if(len_flag) send_len();
 	if(echo_flag||break_flag) read_len();
 	#endif
+	if(write_sign) eep_write();
 	if(rx_flag) uart_reply();
 }
 /*************************************************
@@ -254,10 +272,14 @@ void mod_ctrl(){
 		mod_flag=len_mod;
 	}else if(key_sign==5){
 		mod_flag=temp_mod;
-	}else if(key_sign==8){;
+	}else if(key_sign==8){
 		mod_flag=vol_mod;
 	}else if(key_sign==9){
 		mod_flag=bright_mod;
+	}else if(key_sign==13){
+		read_mod = mod_flag;
+		write_flag = 10;
+		l6 = 1;
 	}
 	key_sign = 0;
 	mod_init();
@@ -465,7 +487,34 @@ void send_str(){
 	tx_flag = 1;
 	tx_pot = 0;
 	SBUF = tx_buf[tx_pot++];		//写数据到UART数据寄存器
-} 
+}
+/*************************************************
+*函数：eep_write()EEPROM写函数
+*功能：向EEPROM写字节
+*************************************************/
+void eep_write(){
+	IIC_Start();
+	IIC_SendByte(0xa0);
+	IIC_WaitAck();
+	IIC_SendByte(write_sign-1<<1);
+	IIC_WaitAck();
+	IIC_SendByte(((u8 *)write_addr)[0]);
+	IIC_WaitAck();
+	IIC_SendByte(((u8 *)write_addr)[1]);
+	IIC_WaitAck();
+	IIC_Stop();
+	write_sign = 0;
+	if(write_flag == 0){
+		l6 = 0;
+	}
+}
+/*************************************************
+*函数：eep_write()EEPROM写函数
+*功能：向EEPROM写字节
+*************************************************/
+void eep_read(){
+
+}
 /*************************************************
 *函数：uart_reply()串口响应函数
 *功能：串口响应接收字符串
@@ -674,6 +723,15 @@ void Sysclk_IT() interrupt 12 using 3
 	}else{
 		bright_timing=500;
 		bright_flag=1;
+	}
+	//EEPROM写时钟
+	if(write_timing){
+		write_timing--;
+	}else{
+		write_timing=1000;
+		if(write_flag){
+			write_sign = write_flag--;
+		}
 	}
 	//按键时长计数
 	if(key_count){
