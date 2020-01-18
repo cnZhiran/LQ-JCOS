@@ -270,33 +270,35 @@ void soft_IT(){
 *功能：模式变换服务
 *************************************************/
 void mod_ctrl(){
-	if(key_sign==4){
-		mod_flag=len_mod;
-	}else if(key_sign==5){
-		mod_flag=temp_mod;
-	}else if(key_sign==8){
-		mod_flag=vol_mod;
-	}else if(key_sign==9){
-		mod_flag=bright_mod;
-	}else if(key_sign==13){
-		if(read_flag == 0){
+	if(read_flag == 0){
+		if(key_sign==4){
+			mod_flag=len_mod;
+		}else if(key_sign==5){
+			mod_flag=temp_mod;
+		}else if(key_sign==8){
+			mod_flag=vol_mod;
+		}else if(key_sign==9){
+			mod_flag=bright_mod;
+		}else if(key_sign==13){
 			read_addr = write_addr;
 			read_mod = mod_flag;
 			write_flag = 10;
 			l6 = 1;
-		}else{
+		}else if(key_sign==23){
+			if(write_flag == 0 && write_sign == 0){
+				mod_flag = read_mod;
+				mod_init();
+				mod_flag = eep_mod;
+				l7 = 1;
+				read_flag = 9;
+				read_sign = 10;
+			}
+		}
+	}else{
+		if(key_sign==13){
 			read_sign = read_flag--;
 			if(read_flag == 0) read_flag = 10;
-		}
-	}else if(key_sign==23){
-		if(read_flag == 0){
-			mod_flag = read_mod;
-			mod_init();
-			mod_flag = eep_mod;
-			l7 = 1;
-			read_flag = 9;
-			read_sign = 10;
-		}else{
+		}else if(key_sign==23){
 			l7 = 0;
 			mod_flag = read_mod;
 			read_flag = 0;
