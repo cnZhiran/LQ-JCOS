@@ -1,4 +1,4 @@
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 1   
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 1   
 
 
 C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
@@ -31,337 +31,392 @@ line level    source
   22          #define vol_mod 2
   23          #define bright_mod 3
   24          #define eep_mod 4
-  25          
-  26          #define len_read_IT   //len_read_once一次性读距离，len_read_IT发读分离法读距离
-  27          
+  25          #define freq_mod 5
+  26          
+  27          #define len_read_IT   //len_read_once一次性读距离，len_read_IT发读分离法读距离
   28          
-  29          sbit Trig = P1^0;
-  30          sbit Echo = P1^1;
-  31          
-  32          u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
-  33          u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
-  34          
-  35          u8 bdata led=0,out=0;
-  36          bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-  37          u8 idata dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
-  38          u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
-  39          u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_t
-             -iming=500;
-  40          u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr;
-  41          u16 length=0,temp=-2000,len=20,vol=250,bright=250;
-  42          
-  43          sbit l1=led^0;
-  44          sbit l2=led^1;
-  45          sbit l3=led^2;
-  46          sbit l4=led^3;
-  47          sbit l5=led^4;
-  48          sbit l6=led^5;
-  49          sbit l7=led^6;
-  50          sbit l8=led^7;
-  51          sbit relay=out^4;
-  52          sbit buzz=out^6;
-  53          
-  54          void mod_init();
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 2   
+  29          
+  30          sbit Trig = P1^0;
+  31          sbit Echo = P1^1;
+  32          
+  33          u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
+  34          u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
+  35          
+  36          u8 bdata led=0,out=0;
+  37          bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
+  38          u8 idata dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
+  39          u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
+  40          u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_t
+             -iming=500,freq_timing=312;
+  41          u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
+  42          u16 length=0,temp=-2000,len=20,vol=250,bright=250;
+  43          u32 freq=1000;
+  44          
+  45          sbit l1=led^0;
+  46          sbit l2=led^1;
+  47          sbit l3=led^2;
+  48          sbit l4=led^3;
+  49          sbit l5=led^4;
+  50          sbit l6=led^5;
+  51          sbit l7=led^6;
+  52          sbit l8=led^7;
+  53          sbit relay=out^4;
+  54          sbit buzz=out^6;
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 2   
 
-  55          void mod_ctrl();
-  56          void read_temp();
-  57          #ifdef len_read_once
+  55          
+  56          void mod_init();
+  57          void mod_ctrl();
+  58          void read_temp();
+  59          #ifdef len_read_once
               void read_len();
               #elif defined len_read_IT 
-  60          void send_len();
-  61          void read_len();
-  62          #endif
-  63          void read_vol();
-  64          void read_bright();
-  65          void scankey();
-  66          void send_str();
-  67          void uart_reply();
-  68          void eep_write();
-  69          void eep_read();
-  70          
-  71          void dis_smg();
-  72          void dis_led();
-  73          void dis_out();
-  74          
-  75          /*************************************************
-  76          *函数：mod_init()系统模式初始化函数
-  77          *功能：系统模式初始化
-  78          *************************************************/
-  79          void mod_init(){
-  80   1        u8 i;
-  81   1        
-  82   1        switch(mod_flag){
-  83   2        case temp_mod:
-  84   2          dis[0]=0xc6;
-  85   2          dis[1]=0xff;
-  86   2          dis[2]=0xff;
-  87   2          dis[3]=0xff;
-  88   2          if(temp>=0x8000){
-  89   3            dis[3]=font[-temp/10000%10];
-  90   3            dis[4]=font[-temp/1000%10];
-  91   3            dis[5]=font[-temp/100%10]&0x7f;
-  92   3            dis[6]=font[-temp/10%10];
-  93   3            dis[7]=font[-temp%10];
-  94   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
-  95   3            dis[i-1]=0xbf;
-  96   3          }else{
-  97   3            dis[3]=font[temp/10000%10];
-  98   3            dis[4]=font[temp/1000%10];
-  99   3            dis[5]=font[temp/100%10]&0x7f;
- 100   3            dis[6]=font[temp/10%10];
- 101   3            dis[7]=font[temp%10];
- 102   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
- 103   3          }
- 104   2          if(write_flag == 0&&write_sign == 0) write_addr = &temp;
- 105   2          return;
- 106   2        case len_mod:
- 107   2          dis[0]=0xc7;
- 108   2          dis[1]=0xff;
- 109   2          dis[2]=0xff;
- 110   2          if(length==0){
- 111   3            dis[3]=font[9];
- 112   3            dis[4]=font[9];
- 113   3            dis[5]=font[9];
- 114   3            dis[6]=font[9]&0x7f;
- 115   3            dis[7]=font[9];
- 116   3          }else{
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 3   
+  62          void send_len();
+  63          void read_len();
+  64          #endif
+  65          void read_vol();
+  66          void read_bright();
+  67          void scankey();
+  68          void send_str();
+  69          void uart_reply();
+  70          void eep_write();
+  71          void eep_read();
+  72          void freq_read();
+  73          
+  74          void dis_smg();
+  75          void dis_led();
+  76          void dis_out();
+  77          
+  78          /*************************************************
+  79          *函数：mod_init()系统模式初始化函数
+  80          *功能：系统模式初始化
+  81          *************************************************/
+  82          void mod_init(){
+  83   1        u8 i;
+  84   1        
+  85   1        switch(mod_flag){
+  86   2        case temp_mod:
+  87   2          dis[0]=0xc6;
+  88   2          dis[1]=0xff;
+  89   2          dis[2]=0xff;
+  90   2          dis[3]=0xff;
+  91   2          if(temp>=0x8000){
+  92   3            dis[3]=font[-temp/10000%10];
+  93   3            dis[4]=font[-temp/1000%10];
+  94   3            dis[5]=font[-temp/100%10]&0x7f;
+  95   3            dis[6]=font[-temp/10%10];
+  96   3            dis[7]=font[-temp%10];
+  97   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+  98   3            dis[i-1]=0xbf;
+  99   3          }else{
+ 100   3            dis[3]=font[temp/10000%10];
+ 101   3            dis[4]=font[temp/1000%10];
+ 102   3            dis[5]=font[temp/100%10]&0x7f;
+ 103   3            dis[6]=font[temp/10%10];
+ 104   3            dis[7]=font[temp%10];
+ 105   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+ 106   3          }
+ 107   2          if(write_flag == 0&&write_sign == 0) write_addr = &temp;
+ 108   2          return;
+ 109   2        case len_mod:
+ 110   2          dis[0]=0xc7;
+ 111   2          dis[1]=0xff;
+ 112   2          dis[2]=0xff;
+ 113   2          if(length==0){
+ 114   3            dis[3]=font[9];
+ 115   3            dis[4]=font[9];
+ 116   3            dis[5]=font[9];
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 3   
 
- 117   3            dis[3]=font[len/10000];
- 118   3            dis[4]=font[len/1000%10];
- 119   3            dis[5]=font[len/100%10];
- 120   3            dis[6]=font[len/10%10]&0x7f;
- 121   3            dis[7]=font[len%10];
- 122   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
- 123   3          }
- 124   2          if(write_flag == 0&&write_sign == 0) write_addr = &len;
- 125   2          return;
- 126   2        case vol_mod:
- 127   2          dis[0]=0xc1;
- 128   2          dis[1]=0xff;
- 129   2          dis[2]=0xff;
- 130   2          dis[3]=0xff;
- 131   2          dis[4]=0xff;
- 132   2          dis[5]=font[vol/100%10]&0x7f;
- 133   2          dis[6]=font[vol/10%10];
- 134   2          dis[7]=font[vol%10];
- 135   2          if(write_flag == 0&&write_sign == 0) write_addr = &vol;
- 136   2          return;
- 137   2        case bright_mod:
- 138   2          dis[0]=0x83;
- 139   2          dis[1]=0xff;
- 140   2          dis[2]=0xff;
- 141   2          dis[3]=0xff;
- 142   2          dis[4]=0xff;
- 143   2          dis[5]=font[bright/100%10]&0x7f;
- 144   2          dis[6]=font[bright/10%10];
- 145   2          dis[7]=font[bright%10];
- 146   2          if(write_flag == 0&&write_sign == 0) write_addr = &bright;
- 147   2          return;
- 148   2        }
- 149   1      }
- 150          /*************************************************
- 151          *函数：Sysclk_init()系统计时初始化函数
- 152          *功能：系统计时初始化
- 153          *硬件：使用T2定时器，规定1ms溢出中断一次
- 154          *************************************************/
- 155          void Sysclk_init(){
- 156   1        AUXR |= 0x04;   //定时器2时钟1T模式
- 157   1        T2L = 0x20;     //设置定时初值
- 158   1        T2H = 0xD1;     //设置定时初值
- 159   1        IE2 |= 0x04;    //开定时器2中断
- 160   1        EA = 1;
- 161   1        AUXR |= 0x10;   //定时器2开始计时
- 162   1      }
- 163          /*************************************************
- 164          *函数：PCA_init()PCA定时器初始化函数
- 165          *功能：PCA定时器初始化       
- 166          *硬件：使用PCA定时器，规定溢出和P11下降沿中断
- 167          *************************************************/
- 168          void PCA_init(){
- 169   1        P_SW1 &= 0xcf;    //(P1.2/ECI, P1.1/CCP0, P1.0/CCP1, P3.7/CCP2)
- 170   1        CCON = 0;                       //初始化PCA控制寄存器
- 171   1                                        //PCA定时器停止
- 172   1                                        //清除CF标志
- 173   1                                        //清除模块中断标志
- 174   1        CL = 0;                         //复位PCA寄存器
- 175   1        CH = 0;
- 176   1        CMOD = 0x01;                    //设置PCA时钟源,允许溢出中断
- 177   1        CCAPM0 = 0x11;                  //PCA模块0为下降沿触发,开启中断。
- 178   1        EA = 1;
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 4   
+ 117   3            dis[6]=font[9]&0x7f;
+ 118   3            dis[7]=font[9];
+ 119   3          }else{
+ 120   3            dis[3]=font[len/10000];
+ 121   3            dis[4]=font[len/1000%10];
+ 122   3            dis[5]=font[len/100%10];
+ 123   3            dis[6]=font[len/10%10]&0x7f;
+ 124   3            dis[7]=font[len%10];
+ 125   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+ 126   3          }
+ 127   2          if(write_flag == 0&&write_sign == 0) write_addr = &len;
+ 128   2          return;
+ 129   2        case vol_mod:
+ 130   2          dis[0]=0xc1;
+ 131   2          dis[1]=0xff;
+ 132   2          dis[2]=0xff;
+ 133   2          dis[3]=0xff;
+ 134   2          dis[4]=0xff;
+ 135   2          dis[5]=font[vol/100%10]&0x7f;
+ 136   2          dis[6]=font[vol/10%10];
+ 137   2          dis[7]=font[vol%10];
+ 138   2          if(write_flag == 0&&write_sign == 0) write_addr = &vol;
+ 139   2          return;
+ 140   2        case bright_mod:
+ 141   2          dis[0]=0x83;
+ 142   2          dis[1]=0xff;
+ 143   2          dis[2]=0xff;
+ 144   2          dis[3]=0xff;
+ 145   2          dis[4]=0xff;
+ 146   2          dis[5]=font[bright/100%10]&0x7f;
+ 147   2          dis[6]=font[bright/10%10];
+ 148   2          dis[7]=font[bright%10];
+ 149   2          if(write_flag == 0&&write_sign == 0) write_addr = &bright;
+ 150   2          return;
+ 151   2        case freq_mod:
+ 152   2          dis[0]=0x8e;
+ 153   2          dis[1]=font[freq/1000000%10];
+ 154   2          dis[2]=font[freq/100000%10];
+ 155   2          dis[3]=font[freq/10000%10];
+ 156   2          dis[4]=font[freq/1000%10];
+ 157   2          dis[5]=font[freq/100%10];
+ 158   2          dis[6]=font[freq/10%10];
+ 159   2          dis[7]=font[freq%10];
+ 160   2          for(i=1;dis[i]==font[0]&&i<8;i++) dis[i]=0xff;
+ 161   2          if(write_flag == 0&&write_sign == 0) write_addr = (u16 *)&freq;
+ 162   2          return;
+ 163   2        }
+ 164   1      }
+ 165          /*************************************************
+ 166          *函数：Sysclk_init()系统计时初始化函数
+ 167          *功能：系统计时初始化
+ 168          *硬件：使用T2定时器，规定1ms溢出中断一次
+ 169          *************************************************/
+ 170          void Sysclk_init(){
+ 171   1        AUXR |= 0x04;   //定时器2时钟1T模式
+ 172   1        T2L = 0x20;     //设置定时初值
+ 173   1        T2H = 0xD1;     //设置定时初值
+ 174   1        IE2 |= 0x04;    //开定时器2中断
+ 175   1        EA = 1;
+ 176   1        AUXR |= 0x10;   //定时器2开始计时
+ 177   1      }
+ 178          /*************************************************
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 4   
 
- 179   1      }
- 180          /*************************************************
- 181          *函数：Uart_init()串口初始化函数
- 182          *功能：串口初始化 
- 183          *硬件：使用T1定时器，波特率为4800
- 184          *************************************************/
- 185          void Uart_init(void)    //4800bps@12.000MHz
- 186          {
- 187   1        SCON = 0x50;    //8位数据,可变波特率
- 188   1        AUXR |= 0x40;   //定时器1时钟为Fosc,即1T
- 189   1        AUXR &= 0xFE;   //串口1选择定时器1为波特率发生器
- 190   1        TMOD &= 0x0F;   //设定定时器1为16位自动重装方式
- 191   1        TL1 = 0x8F;     //设定定时初值
- 192   1        TH1 = 0xFD;     //设定定时初值
- 193   1        ET1 = 0;      //禁止定时器1中断
- 194   1        ES = 1;
- 195   1        EA = 1;
- 196   1        TR1 = 1;      //启动定时器1
- 197   1      
- 198   1        send_str();
- 199   1      }
- 200          /*************************************************
- 201          *函数：delay_us()微秒级延时函数
- 202          *功能：微秒级延时服务
- 203          *备注：尽可能的使用STC-ISP的延时计算器，提高延时精度
- 204          *************************************************/
- 205          void delay100us()   //@12.000MHz
- 206          {
- 207   1        unsigned char i, j;
- 208   1      
- 209   1        i = 2;
- 210   1        j = 39;
- 211   1        do
- 212   1        {
- 213   2          while (--j);
- 214   2        } while (--i);
- 215   1      }
- 216          void delay12us()    //@12.000MHz
- 217          {
- 218   1        unsigned char i;
- 219   1      
- 220   1        _nop_();
- 221   1        _nop_();
- 222   1        i = 33;
- 223   1        while (--i);
- 224   1      }
- 225          /*************************************************
- 226          *函数：init()初始化函数
- 227          *功能：系统进入的初始化服务
- 228          *************************************************/
- 229          void init(){
- 230   1        mod_init();
- 231   1        Trig = 0;
- 232   1        Echo = 1;
- 233   1        PCA_init();
- 234   1        Sysclk_init();
- 235   1        Uart_init();
- 236   1      }
- 237          /*************************************************
- 238          *函数：loop()快速响应函数
- 239          *功能：快速I/O设备的驱动服务，模式变换服务
- 240          *备注：要求函数进行一次的时长要尽可能的短，这样不会影响其他函数的延时等待函数。
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 5   
+ 179          *函数：PCA_init()PCA定时器初始化函数
+ 180          *功能：PCA定时器初始化       
+ 181          *硬件：使用PCA定时器，规定溢出和P11下降沿中断
+ 182          *************************************************/
+ 183          void PCA_init(){
+ 184   1        P_SW1 &= 0xcf;    //(P1.2/ECI, P1.1/CCP0, P1.0/CCP1, P3.7/CCP2)
+ 185   1        CCON = 0;                       //初始化PCA控制寄存器
+ 186   1                                        //PCA定时器停止
+ 187   1                                        //清除CF标志
+ 188   1                                        //清除模块中断标志
+ 189   1        CL = 0;                         //复位PCA寄存器
+ 190   1        CH = 0;
+ 191   1        CMOD = 0x01;                    //设置PCA时钟源,允许溢出中断
+ 192   1        CCAPM0 = 0x11;                  //PCA模块0为下降沿触发,开启中断。
+ 193   1        EA = 1;
+ 194   1      }
+ 195          /*************************************************
+ 196          *函数：Uart_init()串口初始化函数
+ 197          *功能：串口初始化 
+ 198          *硬件：使用T1定时器，波特率为4800
+ 199          *************************************************/
+ 200          void Uart_init(void)    //4800bps@12.000MHz
+ 201          {
+ 202   1        SCON = 0x50;    //8位数据,可变波特率
+ 203   1        AUXR |= 0x40;   //定时器1时钟为Fosc,即1T
+ 204   1        AUXR &= 0xFE;   //串口1选择定时器1为波特率发生器
+ 205   1        TMOD &= 0x0F;   //设定定时器1为16位自动重装方式
+ 206   1        TL1 = 0x8F;     //设定定时初值
+ 207   1        TH1 = 0xFD;     //设定定时初值
+ 208   1        ET1 = 0;      //禁止定时器1中断
+ 209   1        ES = 1;
+ 210   1        EA = 1;
+ 211   1        TR1 = 1;      //启动定时器1
+ 212   1      
+ 213   1        send_str();
+ 214   1      }
+ 215          /*************************************************
+ 216          *函数：delay_us()微秒级延时函数
+ 217          *功能：微秒级延时服务
+ 218          *备注：尽可能的使用STC-ISP的延时计算器，提高延时精度
+ 219          *************************************************/
+ 220          void T0init(void)   //100微秒@12.000MHz
+ 221          {
+ 222   1        AUXR &= 0x7F;   //定时器时钟12T模式
+ 223   1        TMOD |= 0x07;   //设置定时器模式
+ 224   1        TL0 = 0x00;   //设置定时初值
+ 225   1        TH0 = 0x00;   //设置定时初值
+ 226   1        TF0 = 0;    //清除TF0标志
+ 227   1        ET0 = 1;
+ 228   1        EA = 1;
+ 229   1        TR0 = 1;    //定时器0开始计时
+ 230   1      }
+ 231          /*************************************************
+ 232          *函数：delay_us()微秒级延时函数
+ 233          *功能：微秒级延时服务
+ 234          *备注：尽可能的使用STC-ISP的延时计算器，提高延时精度
+ 235          *************************************************/
+ 236          void delay100us()   //@12.000MHz
+ 237          {
+ 238   1        unsigned char i, j;
+ 239   1      
+ 240   1        i = 2;
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 5   
 
- 241          *************************************************/
- 242          void loop(){
- 243   1        scankey();
- 244   1        mod_ctrl();
- 245   1        dis_smg();
- 246   1        dis_led();
- 247   1        dis_out();
- 248   1      }
- 249          /*************************************************
- 250          *函数：soft_IT()中断捕获和处理函数
- 251          *功能：中断捕获和处理服务
- 252          *************************************************/
- 253          void soft_IT(){
- 254   1        
- 255   1        if(temp_flag) read_temp();
- 256   1        if(vol_flag) read_vol();
- 257   1        if(bright_flag) read_bright();
- 258   1        #ifdef len_read_once
+ 241   1        j = 39;
+ 242   1        do
+ 243   1        {
+ 244   2          while (--j);
+ 245   2        } while (--i);
+ 246   1      }
+ 247          void delay12us()    //@12.000MHz
+ 248          {
+ 249   1        unsigned char i;
+ 250   1      
+ 251   1        _nop_();
+ 252   1        _nop_();
+ 253   1        i = 33;
+ 254   1        while (--i);
+ 255   1      }
+ 256          /*************************************************
+ 257          *函数：init()初始化函数
+ 258          *功能：系统进入的初始化服务
+ 259          *************************************************/
+ 260          void init(){
+ 261   1        mod_init();
+ 262   1        Trig = 0;
+ 263   1        Echo = 1;
+ 264   1        PCA_init();
+ 265   1        Sysclk_init();
+ 266   1        T0init();
+ 267   1        Uart_init();
+ 268   1      }
+ 269          /*************************************************
+ 270          *函数：loop()快速响应函数
+ 271          *功能：快速I/O设备的驱动服务，模式变换服务
+ 272          *备注：要求函数进行一次的时长要尽可能的短，这样不会影响其他函数的延时等待函数。
+ 273          *************************************************/
+ 274          void loop(){
+ 275   1        scankey();
+ 276   1        mod_ctrl();
+ 277   1        dis_smg();
+ 278   1        dis_led();
+ 279   1        dis_out();
+ 280   1      }
+ 281          /*************************************************
+ 282          *函数：soft_IT()中断捕获和处理函数
+ 283          *功能：中断捕获和处理服务
+ 284          *************************************************/
+ 285          void soft_IT(){
+ 286   1        
+ 287   1        if(temp_sign) read_temp();
+ 288   1        if(vol_flag) read_vol();
+ 289   1        if(bright_flag) read_bright();
+ 290   1        #ifdef len_read_once
                 if(len_flag) read_len();
                 #elif defined len_read_IT
- 261   1        if(len_flag) send_len();
- 262   1        if(echo_flag||break_flag) read_len();
- 263   1        #endif
- 264   1        if(write_sign) eep_write();
- 265   1        if(read_sign) eep_read();
- 266   1        if(rx_flag) uart_reply();
- 267   1      }
- 268          /*************************************************
- 269          *函数：mod_ctrl()模式变换函数
- 270          *功能：模式变换服务
- 271          *************************************************/
- 272          void mod_ctrl(){
- 273   1        if(read_flag == 0){
- 274   2          if(key_sign==4){
- 275   3            mod_flag=len_mod;
- 276   3          }else if(key_sign==5){
- 277   3            mod_flag=temp_mod;
- 278   3          }else if(key_sign==8){
- 279   3            mod_flag=vol_mod;
- 280   3          }else if(key_sign==9){
- 281   3            mod_flag=bright_mod;
- 282   3          }else if(key_sign==13){
- 283   3            read_addr = write_addr;
- 284   3            read_mod = mod_flag;
- 285   3            write_flag = 10;
- 286   3            l6 = 1;
- 287   3          }else if(key_sign==23){
- 288   3            if(write_flag == 0 && write_sign == 0){
- 289   4              mod_flag = read_mod;
- 290   4              mod_init();
- 291   4              mod_flag = eep_mod;
- 292   4              l7 = 1;
- 293   4              read_flag = 9;
- 294   4              read_sign = 10;
- 295   4            }
- 296   3          }
- 297   2        }else{
- 298   2          if(key_sign==13){
- 299   3            read_sign = read_flag--;
- 300   3            if(read_flag == 0) read_flag = 10;
- 301   3          }else if(key_sign==23){
- 302   3            l7 = 0;
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 6   
+ 293   1        if(len_flag) send_len();
+ 294   1        if(echo_flag||break_flag) read_len();
+ 295   1        #endif
+ 296   1        if(write_sign) eep_write();
+ 297   1        if(read_sign) eep_read();
+ 298   1        if(freq_sign) freq_read();
+ 299   1        if(rx_flag) uart_reply();
+ 300   1      }
+ 301          /*************************************************
+ 302          *函数：mod_ctrl()模式变换函数
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 6   
 
- 303   3            mod_flag = read_mod;
- 304   3            read_flag = 0;
- 305   3          }
- 306   2        }
- 307   1        key_sign = 0;
- 308   1        mod_init();
- 309   1      }
- 310          /*************************************************
- 311          *函数：read_temp()读温度函数
- 312          *功能：读取温度
- 313          *************************************************/
- 314          void read_temp(){
- 315   1        int tp;
- 316   1        u8 tl,th;
- 317   1      
- 318   1        l1=1;
- 319   1        temp_flag=0;
- 320   1        while(init_ds18b20())loop();
- 321   1        Write_DS18B20(0xCC);
- 322   1        Write_DS18B20(0x44);
- 323   1        while(init_ds18b20())loop();
- 324   1        Write_DS18B20(0xCC);
- 325   1        Write_DS18B20(0xBE);
- 326   1        tl=Read_DS18B20();
- 327   1        th=Read_DS18B20();
- 328   1        tp=(th<<8)|tl;
- 329   1        temp=tp*6.25;
- 330   1      
- 331   1        if(mod_flag==temp_mod){
- 332   2          dis[4]=font[temp/1000%10];
- 333   2          dis[5]=font[temp/100%10]&0x7f;
- 334   2          dis[6]=font[temp/10%10];
- 335   2          dis[7]=font[temp%10];
- 336   2        }
- 337   1        l1=0;
- 338   1      
- 339   1      } 
- 340          /*************************************************
- 341          *函数：read_len()一次性读距离函数
- 342          *功能：读取距离
- 343          *************************************************/
- 344          #ifdef len_read_once
+ 303          *功能：模式变换服务
+ 304          *************************************************/
+ 305          void mod_ctrl(){
+ 306   1        if(read_flag == 0){
+ 307   2          if(key_sign==4){
+ 308   3            mod_flag=len_mod;
+ 309   3            mod_init();
+ 310   3          }else if(key_sign==5){
+ 311   3            mod_flag=temp_mod;
+ 312   3            mod_init();
+ 313   3          }else if(key_sign==8){
+ 314   3            mod_flag=vol_mod;
+ 315   3            mod_init();
+ 316   3          }else if(key_sign==9){
+ 317   3            mod_flag=bright_mod;
+ 318   3            mod_init();
+ 319   3          }else if(key_sign==13){
+ 320   3            read_addr = write_addr;
+ 321   3            read_mod = mod_flag;
+ 322   3            write_flag = 10;
+ 323   3            l6 = 1;
+ 324   3            mod_init();
+ 325   3          }else if(key_sign==12){
+ 326   3            mod_flag=freq_mod;
+ 327   3            mod_init();
+ 328   3          }else if(key_sign==23){
+ 329   3            if(write_flag == 0 && write_sign == 0){
+ 330   4              mod_flag = read_mod;
+ 331   4              mod_init();
+ 332   4              mod_flag = eep_mod;
+ 333   4              l7 = 1;
+ 334   4              read_flag = 9;
+ 335   4              read_sign = 10;
+ 336   4            }
+ 337   3          }
+ 338   2        }else{
+ 339   2          if(key_sign==13){
+ 340   3            read_sign = read_flag--;
+ 341   3            if(read_flag == 0) read_flag = 10;
+ 342   3            mod_init();
+ 343   3          }else if(key_sign==23){
+ 344   3            l7 = 0;
+ 345   3            mod_flag = read_mod;
+ 346   3            read_flag = 0;
+ 347   3            mod_init();
+ 348   3          }
+ 349   2        }
+ 350   1        key_sign = 0;
+ 351   1      }
+ 352          /*************************************************
+ 353          *函数：read_temp()读温度函数
+ 354          *功能：读取温度
+ 355          *************************************************/
+ 356          void read_temp(){
+ 357   1        int tp;
+ 358   1        u8 tl,th,i;
+ 359   1      
+ 360   1        l1=1;
+ 361   1        while(init_ds18b20())loop();
+ 362   1        Write_DS18B20(0xCC);
+ 363   1        Write_DS18B20(0x44);
+ 364   1        while(init_ds18b20())loop();
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 7   
+
+ 365   1        Write_DS18B20(0xCC);
+ 366   1        Write_DS18B20(0xBE);
+ 367   1        tl=Read_DS18B20();
+ 368   1        th=Read_DS18B20();
+ 369   1        tp=(th<<8)|tl;
+ 370   1        temp=tp*6.25;
+ 371   1      
+ 372   1        if(mod_flag == temp_mod){
+ 373   2          if(temp>=0x8000){
+ 374   3            dis[3]=font[-temp/10000%10];
+ 375   3            dis[4]=font[-temp/1000%10];
+ 376   3            dis[5]=font[-temp/100%10]&0x7f;
+ 377   3            dis[6]=font[-temp/10%10];
+ 378   3            dis[7]=font[-temp%10];
+ 379   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+ 380   3            dis[i-1]=0xbf;
+ 381   3          }else{
+ 382   3            dis[3]=font[temp/10000%10];
+ 383   3            dis[4]=font[temp/1000%10];
+ 384   3            dis[5]=font[temp/100%10]&0x7f;
+ 385   3            dis[6]=font[temp/10%10];
+ 386   3            dis[7]=font[temp%10];
+ 387   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+ 388   3          }
+ 389   2        }
+ 390   1        temp_sign = 0;
+ 391   1        l1=0;
+ 392   1      } 
+ 393          /*************************************************
+ 394          *函数：read_len()一次性读距离函数
+ 395          *功能：读取距离
+ 396          *************************************************/
+ 397          #ifdef len_read_once
               void read_len(){
                 u8 i=8;
                 
@@ -382,8 +437,6 @@ line level    source
                 CR = 1;                 //PCA定时器开始工作
                 CCAPM0 |= 0x01;         //开启中断
                 while(echo_flag==0&&break_flag==0)loop();
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 7   
-
                 //接收
                 if(break_flag){
                   len=9999;
@@ -393,6 +446,8 @@ line level    source
                     dis[5]=font[9];
                     dis[6]=font[9]&0x7f;
                     dis[7]=font[9];
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 8   
+
                   }
                 }else if(echo_flag){
                   len=length*0.17;
@@ -411,415 +466,456 @@ line level    source
               *功能：读取距离
               *************************************************/
               #elif defined len_read_IT
- 392          //发送
- 393          void send_len(){
- 394   1        u8 i=8;
- 395   1        
- 396   1        break_flag = 0;
- 397   1        echo_flag = 0;
- 398   1        len_flag = 0;
- 399   1        while(i--){
- 400   2          Trig = 1;
- 401   2          delay12us();
- 402   2          Trig = 0;
- 403   2          delay12us();
- 404   2        }
- 405   1        CL = 0;                 //计时器清零
- 406   1        CH = 0;
- 407   1        CCF0 = 0;               //清标志
- 408   1        CF = 0;
- 409   1        CR = 1;                 //PCA定时器开始工作
- 410   1        CCAPM0 |= 0x01;         //开启中断
- 411   1      }
- 412          
- 413          //接收
- 414          void read_len(){
- 415   1        u8 i;
- 416   1        
- 417   1        if(echo_flag){
- 418   2          len=length*0.17;
- 419   2          if(mod_flag==len_mod){
- 420   3            dis[3]=font[len/10000];
- 421   3            dis[4]=font[len/1000%10];
- 422   3            dis[5]=font[len/100%10];
- 423   3            dis[6]=font[len/10%10]&0x7f;
- 424   3            dis[7]=font[len%10];
- 425   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
- 426   3          }
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 8   
+ 445          //发送
+ 446          void send_len(){
+ 447   1        u8 i=8;
+ 448   1        
+ 449   1        break_flag = 0;
+ 450   1        echo_flag = 0;
+ 451   1        len_flag = 0;
+ 452   1        while(i--){
+ 453   2          Trig = 1;
+ 454   2          delay12us();
+ 455   2          Trig = 0;
+ 456   2          delay12us();
+ 457   2        }
+ 458   1        CL = 0;                 //计时器清零
+ 459   1        CH = 0;
+ 460   1        CCF0 = 0;               //清标志
+ 461   1        CF = 0;
+ 462   1        CR = 1;                 //PCA定时器开始工作
+ 463   1        CCAPM0 |= 0x01;         //开启中断
+ 464   1      }
+ 465          
+ 466          //接收
+ 467          void read_len(){
+ 468   1        u8 i;
+ 469   1        
+ 470   1        if(echo_flag){
+ 471   2          len=length*0.17;
+ 472   2          if(mod_flag==len_mod){
+ 473   3            dis[3]=font[len/10000];
+ 474   3            dis[4]=font[len/1000%10];
+ 475   3            dis[5]=font[len/100%10];
+ 476   3            dis[6]=font[len/10%10]&0x7f;
+ 477   3            dis[7]=font[len%10];
+ 478   3            for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+ 479   3          }
+ 480   2        }else if(break_flag){
+ 481   2          len=9999;
+ 482   2          if(mod_flag==len_mod){
+ 483   3            dis[3]=font[9];
+ 484   3            dis[4]=font[9];
+ 485   3            dis[5]=font[9];
+ 486   3            dis[6]=font[9]&0x7f;
+ 487   3            dis[7]=font[9];
+ 488   3          }
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 9   
 
- 427   2        }else if(break_flag){
- 428   2          len=9999;
- 429   2          if(mod_flag==len_mod){
- 430   3            dis[3]=font[9];
- 431   3            dis[4]=font[9];
- 432   3            dis[5]=font[9];
- 433   3            dis[6]=font[9]&0x7f;
- 434   3            dis[7]=font[9];
- 435   3          }
- 436   2        }
- 437   1      }
- 438          #endif
- 439          /*************************************************
- 440          *函数：read_vol()读电位器函数
- 441          *功能：读取电位器电压
- 442          *************************************************/
- 443          void read_vol(){
- 444   1        l3=1;
- 445   1        vol_flag = 0;
- 446   1        IIC_Start();
- 447   1        IIC_SendByte(0x90);
- 448   1        IIC_WaitAck();
- 449   1        IIC_SendByte(0x03);
- 450   1        IIC_WaitAck();
- 451   1        IIC_Start();
- 452   1        IIC_SendByte(0x91);
- 453   1        IIC_WaitAck();
- 454   1        IIC_RecByte();
- 455   1        IIC_SendAck(0);
- 456   1        vol=IIC_RecByte();
- 457   1        vol=vol*500.0/255;
- 458   1        IIC_Stop();
- 459   1      
- 460   1        if(mod_flag==vol_mod){
- 461   2          dis[5]=font[vol/100%10]&0x7f;
- 462   2          dis[6]=font[vol/10%10];
- 463   2          dis[7]=font[vol%10];
- 464   2        }
- 465   1        if(vol>300){
- 466   2          buzz=1;
- 467   2        }else{
- 468   2          buzz=0;
- 469   2        }
- 470   1        l3=0;
- 471   1      }
- 472          /*************************************************
- 473          *函数：read_bright()读亮度函数
- 474          *功能：读取光敏电阻电压
- 475          *************************************************/
- 476          void read_bright(){
- 477   1        l4=1;
- 478   1        bright_flag = 0;
- 479   1        IIC_Start();
- 480   1        IIC_SendByte(0x90);
- 481   1        IIC_WaitAck();
- 482   1        IIC_SendByte(0x01);
- 483   1        IIC_WaitAck();
- 484   1        IIC_Start();
- 485   1        IIC_SendByte(0x91);
- 486   1        IIC_WaitAck();
- 487   1        IIC_RecByte();
- 488   1        IIC_SendAck(0);
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 9   
+ 489   2        }
+ 490   1      }
+ 491          #endif
+ 492          /*************************************************
+ 493          *函数：read_vol()读电位器函数
+ 494          *功能：读取电位器电压
+ 495          *************************************************/
+ 496          void read_vol(){
+ 497   1        l3=1;
+ 498   1        vol_flag = 0;
+ 499   1        IIC_Start();
+ 500   1        IIC_SendByte(0x90);
+ 501   1        IIC_WaitAck();
+ 502   1        IIC_SendByte(0x03);
+ 503   1        IIC_WaitAck();
+ 504   1        IIC_Start();
+ 505   1        IIC_SendByte(0x91);
+ 506   1        IIC_WaitAck();
+ 507   1        IIC_RecByte();
+ 508   1        IIC_SendAck(0);
+ 509   1        vol=IIC_RecByte();
+ 510   1        vol=vol*500.0/255;
+ 511   1        IIC_Stop();
+ 512   1      
+ 513   1        if(mod_flag==vol_mod){
+ 514   2          dis[5]=font[vol/100%10]&0x7f;
+ 515   2          dis[6]=font[vol/10%10];
+ 516   2          dis[7]=font[vol%10];
+ 517   2        }
+ 518   1        if(vol>300){
+ 519   2          buzz=1;
+ 520   2        }else{
+ 521   2          buzz=0;
+ 522   2        }
+ 523   1        l3=0;
+ 524   1      }
+ 525          /*************************************************
+ 526          *函数：read_bright()读亮度函数
+ 527          *功能：读取光敏电阻电压
+ 528          *************************************************/
+ 529          void read_bright(){
+ 530   1        l4=1;
+ 531   1        bright_flag = 0;
+ 532   1        IIC_Start();
+ 533   1        IIC_SendByte(0x90);
+ 534   1        IIC_WaitAck();
+ 535   1        IIC_SendByte(0x01);
+ 536   1        IIC_WaitAck();
+ 537   1        IIC_Start();
+ 538   1        IIC_SendByte(0x91);
+ 539   1        IIC_WaitAck();
+ 540   1        IIC_RecByte();
+ 541   1        IIC_SendAck(0);
+ 542   1        bright=IIC_RecByte();
+ 543   1        bright=bright*500.0/255;
+ 544   1        IIC_Stop();
+ 545   1      
+ 546   1        if(mod_flag==bright_mod){
+ 547   2          dis[5]=font[bright/100%10]&0x7f;
+ 548   2          dis[6]=font[bright/10%10];
+ 549   2          dis[7]=font[bright%10];
+ 550   2        }
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 10  
 
- 489   1        bright=IIC_RecByte();
- 490   1        bright=bright*500.0/255;
- 491   1        IIC_Stop();
- 492   1      
- 493   1        if(mod_flag==bright_mod){
- 494   2          dis[5]=font[bright/100%10]&0x7f;
- 495   2          dis[6]=font[bright/10%10];
- 496   2          dis[7]=font[bright%10];
- 497   2        }
- 498   1        if(bright>300){
- 499   2          relay=1;
- 500   2        }else{
- 501   2          relay=0;
- 502   2        }
- 503   1        l4=0;
- 504   1      } 
- 505          /*************************************************
- 506          *函数：send_str()发送字符串函数
- 507          *功能：向串口发送字符串
- 508          *************************************************/
- 509          void send_str(){
- 510   1        tx_flag = 1;
- 511   1        tx_pot = 0;
- 512   1        SBUF = tx_buf[tx_pot++];    //写数据到UART数据寄存器
- 513   1      }
- 514          /*************************************************
- 515          *函数：eep_write()EEPROM写函数
- 516          *功能：向EEPROM写字节
- 517          *************************************************/
- 518          void eep_write(){
- 519   1        IIC_Start();
- 520   1        IIC_SendByte(0xa0);
- 521   1        IIC_WaitAck();
- 522   1        IIC_SendByte(write_sign-1<<1);
- 523   1        IIC_WaitAck();
- 524   1        IIC_SendByte(((u8 *)write_addr)[0]);
- 525   1        IIC_WaitAck();
- 526   1        IIC_SendByte(((u8 *)write_addr)[1]);
- 527   1        IIC_WaitAck();
- 528   1        IIC_Stop();
- 529   1        write_sign = 0;
- 530   1        if(write_flag == 0){
- 531   2          l6 = 0;
- 532   2          if(read_mod != mod_flag)mod_init();
- 533   2        }
- 534   1      }
- 535          /*************************************************
- 536          *函数：eep_write()EEPROM写函数
- 537          *功能：向EEPROM写字节
- 538          *************************************************/
- 539          void eep_read(){
- 540   1        IIC_Start();
- 541   1        IIC_SendByte(0xa0);
- 542   1        IIC_WaitAck();
- 543   1        IIC_SendByte(read_sign-1<<1);
- 544   1        IIC_WaitAck();
- 545   1        IIC_Start();
- 546   1        IIC_SendByte(0xa1);
- 547   1        IIC_WaitAck();
- 548   1        ((u8 *)read_addr)[0] = IIC_RecByte();
- 549   1        IIC_SendAck(0);
- 550   1        ((u8 *)read_addr)[1] = IIC_RecByte();
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 10  
+ 551   1        if(bright>300){
+ 552   2          relay=1;
+ 553   2        }else{
+ 554   2          relay=0;
+ 555   2        }
+ 556   1        l4=0;
+ 557   1      } 
+ 558          /*************************************************
+ 559          *函数：send_str()发送字符串函数
+ 560          *功能：向串口发送字符串
+ 561          *************************************************/
+ 562          void send_str(){
+ 563   1        tx_flag = 1;
+ 564   1        tx_pot = 0;
+ 565   1        SBUF = tx_buf[tx_pot++];    //写数据到UART数据寄存器
+ 566   1      }
+ 567          /*************************************************
+ 568          *函数：eep_write()EEPROM写函数
+ 569          *功能：向EEPROM写字节
+ 570          *************************************************/
+ 571          void eep_write(){
+ 572   1        IIC_Start();
+ 573   1        IIC_SendByte(0xa0);
+ 574   1        IIC_WaitAck();
+ 575   1        IIC_SendByte(write_sign-1<<1);
+ 576   1        IIC_WaitAck();
+ 577   1        IIC_SendByte(((u8 *)write_addr)[0]);
+ 578   1        IIC_WaitAck();
+ 579   1        IIC_SendByte(((u8 *)write_addr)[1]);
+ 580   1        IIC_WaitAck();
+ 581   1        IIC_Stop();
+ 582   1        write_sign = 0;
+ 583   1        if(write_flag == 0){
+ 584   2          l6 = 0;
+ 585   2          if(read_mod != mod_flag)mod_init();
+ 586   2        }
+ 587   1      }
+ 588          /*************************************************
+ 589          *函数：eep_read()EEPROM读函数
+ 590          *功能：向EEPROM读字节
+ 591          *************************************************/
+ 592          void eep_read(){
+ 593   1        IIC_Start();
+ 594   1        IIC_SendByte(0xa0);
+ 595   1        IIC_WaitAck();
+ 596   1        IIC_SendByte(read_sign-1<<1);
+ 597   1        IIC_WaitAck();
+ 598   1        IIC_Start();
+ 599   1        IIC_SendByte(0xa1);
+ 600   1        IIC_WaitAck();
+ 601   1        ((u8 *)read_addr)[0] = IIC_RecByte();
+ 602   1        IIC_SendAck(0);
+ 603   1        ((u8 *)read_addr)[1] = IIC_RecByte();
+ 604   1        IIC_Stop();
+ 605   1        mod_flag = read_mod;
+ 606   1        mod_init();
+ 607   1        mod_flag = eep_mod;
+ 608   1        read_sign = 0;
+ 609   1      }
+ 610          /*************************************************
+ 611          *函数：uart_reply()串口响应函数
+ 612          *功能：串口响应接收字符串
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 11  
 
- 551   1        IIC_Stop();
- 552   1        mod_flag = read_mod;
- 553   1        mod_init();
- 554   1        mod_flag = eep_mod;
- 555   1        read_sign = 0;
- 556   1      }
- 557          /*************************************************
- 558          *函数：uart_reply()串口响应函数
- 559          *功能：串口响应接收字符串
- 560          *************************************************/
- 561          void uart_reply(){
- 562   1        l5=1;
- 563   1        rx_flag = 0;
- 564   1        if(strcmp(rx_buf,"temp\r\n")==0){
- 565   2          while(tx_flag) loop();
- 566   2          sprintf(tx_buf,"temp:%.2f'C\r\n",temp/100.0);
- 567   2          send_str();
- 568   2        }else if(strcmp(rx_buf,"len\r\n")==0){
- 569   2          while(tx_flag) loop();
- 570   2          sprintf(tx_buf,"len:%.1fcm\r\n",len/10.0);
- 571   2          send_str();
- 572   2        }else if(strcmp(rx_buf,"vol\r\n")==0){
- 573   2          while(tx_flag) loop();
- 574   2          sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
- 575   2          send_str();
- 576   2        }else if(strcmp(rx_buf,"bright\r\n")==0){
- 577   2          while(tx_flag) loop();
- 578   2          sprintf(tx_buf,"bright:%.2fV\r\n",bright/100.0);
- 579   2          send_str();
- 580   2        }
- 581   1        l5=0;
- 582   1      }
- 583          /*************************************************
- 584          *函数：scankey()扫描按键函数
- 585          *功能：扫描按键
- 586          *************************************************/
- 587          void scankey(){
- 588   1        u8 key;
- 589   1      
- 590   1        P4=0xff;P3=0xff;P3&=0xf3;
- 591   1        if(P34==0|P35==0|P42==0|P44==0){
- 592   2          if(key_count==0){
- 593   3            key_count = 1;
- 594   3            key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
- 595   3            P3=0xff;P3&=0xcf;P4=0x00;
- 596   3            delay12us();
- 597   3            key |= P3 &0x0c;
- 598   3            switch(key){
- 599   4              case 0x74:key_flag=4;break;
- 600   4              case 0x78:key_flag=5;break;
- 601   4              case 0xb4:key_flag=8;break;
- 602   4              case 0xb8:key_flag=9;break;
- 603   4              case 0xd4:key_flag=12;break;
- 604   4              case 0xd8:key_flag=13;break;
- 605   4              case 0xe4:key_flag=16;break;
- 606   4              case 0xe8:key_flag=17;break;
- 607   4            }
- 608   3          }
- 609   2          return;
- 610   2        }
- 611   1        if(key_count>1000){
- 612   2          key_count = 0;
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 11  
+ 613          *************************************************/
+ 614          void freq_read(){
+ 615   1        u8 i;
+ 616   1        
+ 617   1        freq = (u32)freq_sign *8;
+ 618   1        if(mod_flag == freq_mod){
+ 619   2          dis[1]=font[freq/1000000%10];
+ 620   2          dis[2]=font[freq/100000%10];
+ 621   2          dis[3]=font[freq/10000%10];
+ 622   2          dis[4]=font[freq/1000%10];
+ 623   2          dis[5]=font[freq/100%10];
+ 624   2          dis[6]=font[freq/10%10];
+ 625   2          dis[7]=font[freq%10];
+ 626   2          for(i=1;dis[i]==font[0]&&i<8;i++) dis[i]=0xff;
+ 627   2        }
+ 628   1        freq_sign = 0;
+ 629   1      }
+ 630          /*************************************************
+ 631          *函数：uart_reply()串口响应函数
+ 632          *功能：串口响应接收字符串
+ 633          *************************************************/
+ 634          void uart_reply(){
+ 635   1        l5=1;
+ 636   1        rx_flag = 0;
+ 637   1        if(strcmp(rx_buf,"temp\r\n")==0){
+ 638   2          while(tx_flag) loop();
+ 639   2          sprintf(tx_buf,"temp:%.2f'C\r\n",temp/100.0);
+ 640   2          send_str();
+ 641   2        }else if(strcmp(rx_buf,"len\r\n")==0){
+ 642   2          while(tx_flag) loop();
+ 643   2          sprintf(tx_buf,"len:%.1fcm\r\n",len/10.0);
+ 644   2          send_str();
+ 645   2        }else if(strcmp(rx_buf,"vol\r\n")==0){
+ 646   2          while(tx_flag) loop();
+ 647   2          sprintf(tx_buf,"vol:%.2fV\r\n",vol/100.0);
+ 648   2          send_str();
+ 649   2        }else if(strcmp(rx_buf,"bright\r\n")==0){
+ 650   2          while(tx_flag) loop();
+ 651   2          sprintf(tx_buf,"bright:%.2fV\r\n",bright/100.0);
+ 652   2          send_str();
+ 653   2        }
+ 654   1        l5=0;
+ 655   1      }
+ 656          /*************************************************
+ 657          *函数：scankey()扫描按键函数
+ 658          *功能：扫描按键
+ 659          *************************************************/
+ 660          void scankey(){
+ 661   1        u8 key;
+ 662   1      
+ 663   1        P4=0xff;P3=0xff;P3&=0xf3;
+ 664   1        if(P35==0|P42==0|P44==0){
+ 665   2          if(key_count==0){
+ 666   3            key_count = 1;
+ 667   3            key = (u8)P35<<5;key |= (u8)P42<<6;key |= (u8)P44<<7;
+ 668   3            P3=0xff;P35=0;P4=0x00;
+ 669   3            delay12us();
+ 670   3            key |= P3 &0x0c;
+ 671   3            switch(key){
+ 672   4              case 0x64:key_flag=4;break;
+ 673   4              case 0x68:key_flag=5;break;
+ 674   4              case 0xa4:key_flag=8;break;
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 12  
 
- 613   2          key_sign = key_flag +10;
- 614   2        }else if(key_count>2){
- 615   2          key_count=0;
- 616   2          key_sign = key_flag;
- 617   2        }else{
- 618   2          key_count=0;
- 619   2        }
- 620   1      }
- 621          /*************************************************
- 622          *函数：dis_smg()数码管显示函数
- 623          *功能：驱动显示数码管
- 624          *************************************************/
- 625          void dis_smg(){
- 626   1        u8 i;
- 627   1      
- 628   1        for(i=0;i<8;i++){
- 629   2          P2&=0x1f;
- 630   2          P0=1<<i;
- 631   2          P2|=y6;
- 632   2          _nop_();
- 633   2          P2&=0x1f;
- 634   2          P0=dis[i];
- 635   2          P2|=y7;
- 636   2          delay100us();
- 637   2          P0=0xff;
- 638   2        }
- 639   1      }
- 640          /*************************************************
- 641          *函数：dis_led()LED显示函数
- 642          *功能：驱动显示LED
- 643          *************************************************/
- 644          void dis_led(){
- 645   1        P2&=0x1f;
- 646   1        P0=~led;
- 647   1        P2|=y4;
- 648   1        P2&=0x1f;
- 649   1      }
- 650          /*************************************************
- 651          *函数：dis_out()OUT显示函数
- 652          *功能：驱动显示OUT
- 653          *************************************************/
- 654          void dis_out(){
- 655   1        P2&=0x1f;
- 656   1        P0=out;
- 657   1        P2|=y5;
- 658   1        P2&=0x1f;
- 659   1      }
- 660          /*************************************************
- 661          *函数：main()系统进入函数
- 662          *功能：系统进入初始化服务，系统进行服务
- 663          *************************************************/
- 664          void main(){
- 665   1        //初始化
- 666   1        init();
- 667   1        while(1){
- 668   2          //快速I/O操作
- 669   2          loop();
- 670   2          //中断检查与处理
- 671   2          soft_IT();
- 672   2        } 
- 673   1      }
- 674          /*************************************************
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 12  
+ 675   4              case 0xa8:key_flag=9;break;
+ 676   4              case 0xc4:key_flag=12;break;
+ 677   4              case 0xc8:key_flag=13;break;
+ 678   4            }
+ 679   3          }
+ 680   2          return;
+ 681   2        }
+ 682   1        if(key_count>1000){
+ 683   2          key_count = 0;
+ 684   2          key_sign = key_flag +10;
+ 685   2        }else if(key_count>2){
+ 686   2          key_count=0;
+ 687   2          key_sign = key_flag;
+ 688   2        }else{
+ 689   2          key_count=0;
+ 690   2        }
+ 691   1      }
+ 692          /*************************************************
+ 693          *函数：dis_smg()数码管显示函数
+ 694          *功能：驱动显示数码管
+ 695          *************************************************/
+ 696          void dis_smg(){
+ 697   1        u8 i;
+ 698   1      
+ 699   1        for(i=0;i<8;i++){
+ 700   2          P2&=0x1f;
+ 701   2          P0=1<<i;
+ 702   2          P2|=y6;
+ 703   2          _nop_();
+ 704   2          P2&=0x1f;
+ 705   2          P0=dis[i];
+ 706   2          P2|=y7;
+ 707   2          delay100us();
+ 708   2          P0=0xff;
+ 709   2        }
+ 710   1      }
+ 711          /*************************************************
+ 712          *函数：dis_led()LED显示函数
+ 713          *功能：驱动显示LED
+ 714          *************************************************/
+ 715          void dis_led(){
+ 716   1        P2&=0x1f;
+ 717   1        P0=~led;
+ 718   1        P2|=y4;
+ 719   1        P2&=0x1f;
+ 720   1      }
+ 721          /*************************************************
+ 722          *函数：dis_out()OUT显示函数
+ 723          *功能：驱动显示OUT
+ 724          *************************************************/
+ 725          void dis_out(){
+ 726   1        P2&=0x1f;
+ 727   1        P0=out;
+ 728   1        P2|=y5;
+ 729   1        P2&=0x1f;
+ 730   1      }
+ 731          /*************************************************
+ 732          *函数：main()系统进入函数
+ 733          *功能：系统进入初始化服务，系统进行服务
+ 734          *************************************************/
+ 735          void main(){
+ 736   1        //初始化
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 13  
 
- 675          *函数：Uart()串口中断处理函数
- 676          *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
- 677          *硬件：使用T2定时器，规定1ms溢出中断一次
- 678          *************************************************/
- 679          void Uart() interrupt 4 using 2
- 680          {
- 681   1          if (RI){
- 682   2            RI = 0;                 //清除RI位
- 683   2            rx_buf[rx_pot] = SBUF;//存串口数据
- 684   2            if(rx_buf[rx_pot]=='?'){
- 685   3              rx_pot = 0;
- 686   3            }else if(rx_buf[rx_pot]=='\n'){
- 687   3              rx_buf[++rx_pot] ='\0';
- 688   3              rx_flag = 1;
- 689   3              rx_pot = 0;   
- 690   3            }else{
- 691   3              if(++rx_pot>=15) rx_pot = 0;
- 692   3            }
- 693   2          }
- 694   1          if (TI){
- 695   2            TI = 0;                 //清除TI位
- 696   2            if(tx_buf[tx_pot]){
- 697   3              SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
- 698   3            if(++tx_pot>=15) tx_pot=0;
- 699   3          }else{
- 700   3            tx_pot = 0;
- 701   3            tx_flag = 0;
- 702   3          }
- 703   2        }
- 704   1      }
- 705          /*************************************************
- 706          *函数：PCA_isr()PCA定时器中断处理函数
- 707          *功能：脉冲时长计数服务
- 708          *硬件：使用PCA定时器，规定溢出和P11下降沿中断
- 709          *输出：count记录从定时器打开到下降沿之前的时长计数
- 710          *************************************************/
- 711          void PCA_isr() interrupt 7 using 3
- 712          { 
- 713   1        if (CCF0){
- 714   2          CCF0 = 0;
- 715   2          length = (CCAP0H<<8)|CCAP0L;  //保存本次的捕获值
- 716   2          echo_flag = 1;
- 717   2          CR = 0;                       //PCA定时器停止工作
- 718   2          CCAPM0 &= 0xfe;               //关闭中断
- 719   2        }
- 720   1        if (CF){
- 721   2          CF = 0;
- 722   2          break_flag = 1;
- 723   2          CR = 0;                       //PCA定时器停止工作
- 724   2          CCAPM0 &= 0xfe;               //关闭中断
- 725   2        }
- 726   1      }
- 727          /*************************************************
- 728          *函数：Sysclk_IT()系统定时中断处理函数
- 729          *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
- 730          *硬件：使用T2定时器，规定1ms溢出中断一次
- 731          *************************************************/
- 732          void Sysclk_IT() interrupt 12 using 3
- 733          {
- 734   1        //毫秒级延时服务
- 735   1        if(delay_timing){
- 736   2          delay_timing--;
-C51 COMPILER V9.59.0.0   MAIN                                                              01/18/2020 21:18:12 PAGE 13  
+ 737   1        init();
+ 738   1        while(1){
+ 739   2          //快速I/O操作
+ 740   2          loop();
+ 741   2          //中断检查与处理
+ 742   2          soft_IT();
+ 743   2        } 
+ 744   1      }
+ 745          
+ 746          void T0_it() interrupt 1 using 1
+ 747          {
+ 748   1        freq_T++;
+ 749   1        TF0 = 0;
+ 750   1      }
+ 751          
+ 752          /*************************************************
+ 753          *函数：Uart()串口中断处理函数
+ 754          *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
+ 755          *硬件：使用T2定时器，规定1ms溢出中断一次
+ 756          *************************************************/
+ 757          void Uart() interrupt 4 using 2
+ 758          {
+ 759   1          if (RI){
+ 760   2            RI = 0;                 //清除RI位
+ 761   2            rx_buf[rx_pot] = SBUF;//存串口数据
+ 762   2            if(rx_buf[rx_pot]=='?'){
+ 763   3              rx_pot = 0;
+ 764   3            }else if(rx_buf[rx_pot]=='\n'){
+ 765   3              rx_buf[++rx_pot] ='\0';
+ 766   3              rx_flag = 1;
+ 767   3              rx_pot = 0;   
+ 768   3            }else{
+ 769   3              if(++rx_pot>=15) rx_pot = 0;
+ 770   3            }
+ 771   2          }
+ 772   1          if (TI){
+ 773   2            TI = 0;                 //清除TI位
+ 774   2            if(tx_buf[tx_pot]){
+ 775   3              SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
+ 776   3            if(++tx_pot>=15) tx_pot=0;
+ 777   3          }else{
+ 778   3            tx_pot = 0;
+ 779   3            tx_flag = 0;
+ 780   3          }
+ 781   2        }
+ 782   1      }
+ 783          /*************************************************
+ 784          *函数：PCA_isr()PCA定时器中断处理函数
+ 785          *功能：脉冲时长计数服务
+ 786          *硬件：使用PCA定时器，规定溢出和P11下降沿中断
+ 787          *输出：count记录从定时器打开到下降沿之前的时长计数
+ 788          *************************************************/
+ 789          void PCA_isr() interrupt 7 using 3
+ 790          { 
+ 791   1        if (CCF0){
+ 792   2          CCF0 = 0;
+ 793   2          length = (CCAP0H<<8)|CCAP0L;  //保存本次的捕获值
+ 794   2          echo_flag = 1;
+ 795   2          CR = 0;                       //PCA定时器停止工作
+ 796   2          CCAPM0 &= 0xfe;               //关闭中断
+ 797   2        }
+ 798   1        if (CF){
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 14  
 
- 737   2        }
- 738   1        //18B20定时读取
- 739   1        if(temp_timing){
- 740   2          temp_timing--;
- 741   2        }else{
- 742   2          temp_timing=500;
- 743   2          temp_flag=1;
- 744   2        }
- 745   1        //超声波定时读取
- 746   1        if(len_timing){
- 747   2          len_timing--;
- 748   2        }else{
- 749   2          len_timing=1000;
- 750   2          len_flag=1;
- 751   2        }
- 752   1        //电位器定时读取
- 753   1        if(vol_timing){
- 754   2          vol_timing--;
- 755   2        }else{
- 756   2          vol_timing=500;
- 757   2          vol_flag=1;
- 758   2        }
- 759   1        //光敏电阻定时读取
- 760   1        if(bright_timing){
- 761   2          bright_timing--;
- 762   2        }else{
- 763   2          bright_timing=500;
- 764   2          bright_flag=1;
- 765   2        }
- 766   1        //EEPROM写时钟
- 767   1        if(write_timing){
- 768   2          write_timing--;
- 769   2        }else{
- 770   2          write_timing=1000;
- 771   2          if(write_flag){
- 772   3            write_sign = write_flag--;
- 773   3          }
- 774   2        }
- 775   1        //按键时长计数
- 776   1        if(key_count){
- 777   2          if(++key_count==0)key_count=1001;
- 778   2        }
- 779   1      }
+ 799   2          CF = 0;
+ 800   2          break_flag = 1;
+ 801   2          CR = 0;                       //PCA定时器停止工作
+ 802   2          CCAPM0 &= 0xfe;               //关闭中断
+ 803   2        }
+ 804   1      }
+ 805          
+ 806          /*************************************************
+ 807          *函数：Sysclk_IT()系统定时中断处理函数
+ 808          *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
+ 809          *硬件：使用T2定时器，规定1ms溢出中断一次
+ 810          *************************************************/
+ 811          void Sysclk_IT() interrupt 12 using 3
+ 812          {
+ 813   1        //毫秒级延时服务
+ 814   1        if(delay_timing){
+ 815   2          delay_timing--;
+ 816   2        }
+ 817   1        //18B20定时读取
+ 818   1        if(temp_timing){
+ 819   2          temp_timing--;
+ 820   2        }else{
+ 821   2          temp_timing=500;
+ 822   2          temp_sign=1;
+ 823   2        }
+ 824   1        //超声波定时读取
+ 825   1        if(len_timing){
+ 826   2          len_timing--;
+ 827   2        }else{
+ 828   2          len_timing=1000;
+ 829   2          len_flag=1;
+ 830   2        }
+ 831   1        //电位器定时读取
+ 832   1        if(vol_timing){
+ 833   2          vol_timing--;
+ 834   2        }else{
+ 835   2          vol_timing=500;
+ 836   2          vol_flag=1;
+ 837   2        }
+ 838   1        //光敏电阻定时读取
+ 839   1        if(bright_timing){
+ 840   2          bright_timing--;
+ 841   2        }else{
+ 842   2          bright_timing=500;
+ 843   2          bright_flag=1;
+ 844   2        }
+ 845   1        //EEPROM写时钟
+ 846   1        if(write_timing){
+ 847   2          write_timing--;
+ 848   2        }else{
+ 849   2          write_timing=1000;
+ 850   2          if(write_flag){
+ 851   3            write_sign = write_flag--;
+ 852   3          }
+ 853   2        }
+ 854   1        if(freq_timing){
+ 855   2          freq_timing--;
+ 856   2        }else{
+ 857   2          freq_timing=125;
+ 858   2          TR0 = 0;
+ 859   2          ((u8 *)&freq_sign)[0] = TL0;
+ 860   2          ((u8 *)&freq_sign)[1] = TH0;
+C51 COMPILER V9.59.0.0   MAIN                                                              01/20/2020 16:44:56 PAGE 15  
+
+ 861   2          freq_H = freq_T;
+ 862   2          freq_T = 0;
+ 863   2          TH0 = 0x00;
+ 864   2          TL0 = 0x00;
+ 865   2          TR0 = 1;
+ 866   2        }
+ 867   1        //按键时长计数
+ 868   1        if(key_count){
+ 869   2          if(++key_count==0)key_count=1001;
+ 870   2        }
+ 871   1      }
 
 
 MODULE INFORMATION:   STATIC OVERLAYABLE
-   CODE SIZE        =   3796    ----
+   CODE SIZE        =   5025    ----
    CONSTANT SIZE    =     96    ----
-   XDATA SIZE       =     20       2
+   XDATA SIZE       =     26       3
    PDATA SIZE       =   ----    ----
    DATA SIZE        =      2    ----
-   IDATA SIZE       =     63    ----
+   IDATA SIZE       =     67    ----
    BIT SIZE         =      8    ----
 END OF MODULE INFORMATION.
 
