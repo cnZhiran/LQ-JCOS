@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <onewire.h>
 #include <iic.h>
+#include <ds1302.h>
 
 #ifndef u8
 #define u8 unsigned char
@@ -26,18 +27,21 @@
 
 #define len_read_IT		//len_read_once一次性读距离，len_read_IT发读分离法读距离
 
+#define trans(x) ((x&0x7f)>>4)*10.0+(x&0x0f) //对DS1302的值进行进制转换的函数
 
 sbit Trig = P1^0;
 sbit Echo = P1^1;
 
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
+u8 code time_write_addr[8]={0x80,0x82,0x84,0x86,0x88,0x8a,0x8c,0x8e};
+u8 code time_read_addr[8]={0x81,0x83,0x85,0x87,0x89,0x8b,0x8d,0x8f};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 u8 bdata led=0,out=0;
-bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-u8 idata dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
+bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0,time_sign=0;
+u8 idata time[8]={0x00,0x00,0x12,0x01,0x01,0x03,0x20,0x00},dis[8],tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
-u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0;
+u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0,time_timing=187;
 u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
 u16 length=0,temp=-2000,len=20,vol=250,bright=250;
 u32 freq=1000;
@@ -70,6 +74,8 @@ void uart_reply();
 void eep_write();
 void eep_read();
 void freq_read();
+void time_init();
+void time_read();
 
 void dis_smg();
 void dis_led();
@@ -213,9 +219,8 @@ void Uart_init(void)		//4800bps@12.000MHz
 	send_str();
 }
 /*************************************************
-*函数：delay_us()微秒级延时函数
-*功能：微秒级延时服务
-*备注：尽可能的使用STC-ISP的延时计算器，提高延时精度
+*函数：T0init()T0计数器初始化函数
+*功能：计数器初始化
 *************************************************/
 void T0init(void)		//100微秒@12.000MHz
 {
@@ -227,6 +232,14 @@ void T0init(void)		//100微秒@12.000MHz
 	ET0 = 1;
 	EA = 1;
 	TR0 = 1;		//定时器0开始计时
+}
+/*************************************************
+*函数：time_init()DS1302初始化函数
+*功能：时间芯片初始化
+*************************************************/
+void time_init(){
+	u8 i=8;
+	while(i--) Write_Ds1302_Byte(time_write_addr[i],time[i]);
 }
 /*************************************************
 *函数：delay_us()微秒级延时函数
@@ -265,6 +278,7 @@ void init(){
 	Sysclk_init();
 	T0init();
 	Uart_init();
+	time_init();
 }
 /*************************************************
 *函数：loop()快速响应函数
@@ -295,6 +309,7 @@ void soft_IT(){
 	#endif
 	if(write_sign) eep_write();
 	if(read_sign) eep_read();
+	if(time_sign) time_read();
 	if(freq_sign) freq_read();
 	if(rx_flag) uart_reply();
 }
@@ -608,13 +623,22 @@ void eep_read(){
 	read_sign = 0;
 }
 /*************************************************
+*函数：time_read()读时间函数
+*功能：读取DS1302
+*************************************************/
+void time_read(){
+	u8 i=7;
+	while(i--) time[i]=Read_Ds1302_Byte(time_read_addr[i]);
+	time_sign = 0;
+}
+/*************************************************
 *函数：uart_reply()串口响应函数
 *功能：串口响应接收字符串
 *************************************************/
 void freq_read(){
 	u8 i;
 	
-	freq = ((u32)freq_sign|(u32)freq_H<<8);
+	freq = (u32)freq_sign<<3;
 	if(mod_flag == freq_mod){
 		dis[1]=font[freq/1000000%10];
 		dis[2]=font[freq/100000%10];
@@ -650,6 +674,14 @@ void uart_reply(){
 	}else if(strcmp(rx_buf,"bright\r\n")==0){
 		while(tx_flag) loop();
 		sprintf(tx_buf,"bright:%.2fV\r\n",bright/100.0);
+		send_str();
+	}else if(strcmp(rx_buf,"time\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"time:%.0f:%.0f:%.0f\r\n",trans(time[2]),trans(time[1]),trans(time[0]));
+		send_str();
+	}else if(strcmp(rx_buf,"date\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"date:%.0f-%.0f-%.0f\r\n",trans(time[6]),trans(time[4]),trans(time[3]));
 		send_str();
 	}
 	l5=0;
@@ -750,7 +782,6 @@ void main(){
 void T0_it() interrupt 1 using 1
 {
 	freq_T++;
-	TR0 = 0;
 	TF0 = 0;
 }
 
@@ -859,8 +890,8 @@ void Sysclk_IT() interrupt 12 using 3
 	if(freq_timing){
 		freq_timing--;
 	}else{
-		freq_timing=5000;
-		count_timing=1000;
+		freq_timing=1000;
+		count_timing=125;
 		TH0 = 0x00;
 		TL0 = 0x00;
 		TR0 = 1;
@@ -873,6 +904,12 @@ void Sysclk_IT() interrupt 12 using 3
 		((u8 *)&freq_sign)[1] = TH0;
 		freq_H = freq_T;
 		freq_T = 0;
+	}
+	if(time_timing){
+		time_timing--;
+	}else{
+		time_timing = 500;
+		time_sign = 1;
 	}
 	//按键时长计数
 	if(key_count){
