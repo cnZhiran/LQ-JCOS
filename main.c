@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <onewire.h>
 #include <iic.h>
+#include <ds1302.h>
 
 #ifndef u8
 #define u8 unsigned char
@@ -22,23 +23,28 @@
 #define vol_mod 2
 #define bright_mod 3
 #define eep_mod 4
+#define freq_mod 5
 
 #define len_read_IT		//len_read_once一次性读距离，len_read_IT发读分离法读距离
 
+#define trans(x) ((x&0x7f)>>4)*10.0+(x&0x0f) //对DS1302的值进行进制转换的函数
 
 sbit Trig = P1^0;
 sbit Echo = P1^1;
 
 u8 code font[10]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90};
+u8 code time_write_addr[8]={0x80,0x82,0x84,0x86,0x88,0x8a,0x8c,0x8e};
+u8 code time_read_addr[8]={0x81,0x83,0x85,0x87,0x89,0x8b,0x8d,0x8f};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 u8 bdata led=0,out=0;
-bit temp_flag=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
-u8 idata dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0";
+bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0,time_sign=0;
+u8 idata time[8]={0x00,0x00,0x12,0x01,0x01,0x03,0x20,0x00},dis[8],tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
-u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500;
-u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr;
+u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0,time_timing=187;
+u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
 u16 length=0,temp=-2000,len=20,vol=250,bright=250;
+u32 freq=1000;
 
 sbit l1=led^0;
 sbit l2=led^1;
@@ -67,6 +73,9 @@ void send_str();
 void uart_reply();
 void eep_write();
 void eep_read();
+void freq_read();
+void time_init();
+void time_read();
 
 void dis_smg();
 void dis_led();
@@ -145,6 +154,18 @@ void mod_init(){
 		dis[7]=font[bright%10];
 		if(write_flag == 0&&write_sign == 0) write_addr = &bright;
 		return;
+	case freq_mod:
+		dis[0]=0x8e;
+		dis[1]=font[freq/1000000%10];
+		dis[2]=font[freq/100000%10];
+		dis[3]=font[freq/10000%10];
+		dis[4]=font[freq/1000%10];
+		dis[5]=font[freq/100%10];
+		dis[6]=font[freq/10%10];
+		dis[7]=font[freq%10];
+		for(i=1;dis[i]==font[0]&&i<8;i++) dis[i]=0xff;
+		if(write_flag == 0&&write_sign == 0) write_addr = (u16 *)&freq;
+		return;
 	}
 }
 /*************************************************
@@ -198,6 +219,29 @@ void Uart_init(void)		//4800bps@12.000MHz
 	send_str();
 }
 /*************************************************
+*函数：T0init()T0计数器初始化函数
+*功能：计数器初始化
+*************************************************/
+void T0init(void)		//100微秒@12.000MHz
+{
+	AUXR &= 0x7F;		//定时器时钟12T模式
+	TMOD |= 0x07;		//设置定时器模式
+	TL0 = 0x00;		//设置定时初值
+	TH0 = 0x00;		//设置定时初值
+	TF0 = 0;		//清除TF0标志
+	ET0 = 1;
+	EA = 1;
+	TR0 = 1;		//定时器0开始计时
+}
+/*************************************************
+*函数：time_init()DS1302初始化函数
+*功能：时间芯片初始化
+*************************************************/
+void time_init(){
+	u8 i=8;
+	while(i--) Write_Ds1302_Byte(time_write_addr[i],time[i]);
+}
+/*************************************************
 *函数：delay_us()微秒级延时函数
 *功能：微秒级延时服务
 *备注：尽可能的使用STC-ISP的延时计算器，提高延时精度
@@ -232,7 +276,9 @@ void init(){
 	Echo = 1;
 	PCA_init();
 	Sysclk_init();
+	T0init();
 	Uart_init();
+	time_init();
 }
 /*************************************************
 *函数：loop()快速响应函数
@@ -252,7 +298,7 @@ void loop(){
 *************************************************/
 void soft_IT(){
 	
-	if(temp_flag) read_temp();
+	if(temp_sign) read_temp();
 	if(vol_flag) read_vol();
 	if(bright_flag) read_bright();
 	#ifdef len_read_once
@@ -263,6 +309,8 @@ void soft_IT(){
 	#endif
 	if(write_sign) eep_write();
 	if(read_sign) eep_read();
+	if(time_sign) time_read();
+	if(freq_sign) freq_read();
 	if(rx_flag) uart_reply();
 }
 /*************************************************
@@ -273,17 +321,25 @@ void mod_ctrl(){
 	if(read_flag == 0){
 		if(key_sign==4){
 			mod_flag=len_mod;
+			mod_init();
 		}else if(key_sign==5){
 			mod_flag=temp_mod;
+			mod_init();
 		}else if(key_sign==8){
 			mod_flag=vol_mod;
+			mod_init();
 		}else if(key_sign==9){
 			mod_flag=bright_mod;
+			mod_init();
 		}else if(key_sign==13){
 			read_addr = write_addr;
 			read_mod = mod_flag;
 			write_flag = 10;
 			l6 = 1;
+			mod_init();
+		}else if(key_sign==12){
+			mod_flag=freq_mod;
+			mod_init();
 		}else if(key_sign==23){
 			if(write_flag == 0 && write_sign == 0){
 				mod_flag = read_mod;
@@ -298,14 +354,15 @@ void mod_ctrl(){
 		if(key_sign==13){
 			read_sign = read_flag--;
 			if(read_flag == 0) read_flag = 10;
+			mod_init();
 		}else if(key_sign==23){
 			l7 = 0;
 			mod_flag = read_mod;
 			read_flag = 0;
+			mod_init();
 		}
 	}
 	key_sign = 0;
-	mod_init();
 }
 /*************************************************
 *函数：read_temp()读温度函数
@@ -313,10 +370,9 @@ void mod_ctrl(){
 *************************************************/
 void read_temp(){
 	int tp;
-	u8 tl,th;
+	u8 tl,th,i;
 
 	l1=1;
-	temp_flag=0;
 	while(init_ds18b20())loop();
 	Write_DS18B20(0xCC);
 	Write_DS18B20(0x44);
@@ -328,14 +384,26 @@ void read_temp(){
 	tp=(th<<8)|tl;
 	temp=tp*6.25;
 
-	if(mod_flag==temp_mod){
-		dis[4]=font[temp/1000%10];
-		dis[5]=font[temp/100%10]&0x7f;
-		dis[6]=font[temp/10%10];
-		dis[7]=font[temp%10];
+	if(mod_flag == temp_mod){
+		if(temp>=0x8000){
+			dis[3]=font[-temp/10000%10];
+			dis[4]=font[-temp/1000%10];
+			dis[5]=font[-temp/100%10]&0x7f;
+			dis[6]=font[-temp/10%10];
+			dis[7]=font[-temp%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+			dis[i-1]=0xbf;
+		}else{
+			dis[3]=font[temp/10000%10];
+			dis[4]=font[temp/1000%10];
+			dis[5]=font[temp/100%10]&0x7f;
+			dis[6]=font[temp/10%10];
+			dis[7]=font[temp%10];
+			for(i=3;dis[i]==font[0];i++) dis[i]=0xff;
+		}
 	}
+	temp_sign = 0;
 	l1=0;
-
 }	
 /*************************************************
 *函数：read_len()一次性读距离函数
@@ -533,8 +601,8 @@ void eep_write(){
 	}
 }
 /*************************************************
-*函数：eep_write()EEPROM写函数
-*功能：向EEPROM写字节
+*函数：eep_read()EEPROM读函数
+*功能：向EEPROM读字节
 *************************************************/
 void eep_read(){
 	IIC_Start();
@@ -553,6 +621,36 @@ void eep_read(){
 	mod_init();
 	mod_flag = eep_mod;
 	read_sign = 0;
+}
+/*************************************************
+*函数：time_read()读时间函数
+*功能：读取DS1302
+*************************************************/
+void time_read(){
+	u8 i=7;
+	while(i--) time[i]=Read_Ds1302_Byte(time_read_addr[i]);
+	time_sign = 0;
+}
+/*************************************************
+*函数：uart_reply()串口响应函数
+*功能：串口响应接收字符串
+*************************************************/
+void freq_read(){
+	u8 i;
+	
+	freq = (u32)freq_sign<<3;
+	if(mod_flag == freq_mod){
+		dis[1]=font[freq/1000000%10];
+		dis[2]=font[freq/100000%10];
+		dis[3]=font[freq/10000%10];
+		dis[4]=font[freq/1000%10];
+		dis[5]=font[freq/100%10];
+		dis[6]=font[freq/10%10];
+		dis[7]=font[freq%10];
+		for(i=1;dis[i]==font[0]&&i<8;i++) dis[i]=0xff;
+	}
+	freq_sign = 0;
+	freq_H = 0;
 }
 /*************************************************
 *函数：uart_reply()串口响应函数
@@ -577,6 +675,14 @@ void uart_reply(){
 		while(tx_flag) loop();
 		sprintf(tx_buf,"bright:%.2fV\r\n",bright/100.0);
 		send_str();
+	}else if(strcmp(rx_buf,"time\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"time:%.0f:%.0f:%.0f\r\n",trans(time[2]),trans(time[1]),trans(time[0]));
+		send_str();
+	}else if(strcmp(rx_buf,"date\r\n")==0){
+		while(tx_flag) loop();
+		sprintf(tx_buf,"date:%.0f-%.0f-%.0f\r\n",trans(time[6]),trans(time[4]),trans(time[3]));
+		send_str();
 	}
 	l5=0;
 }
@@ -588,22 +694,20 @@ void scankey(){
 	u8 key;
 
 	P4=0xff;P3=0xff;P3&=0xf3;
-	if(P34==0|P35==0|P42==0|P44==0){
+	if(P35==0|P42==0|P44==0){
 		if(key_count==0){
 			key_count = 1;
-			key = P3 &0x30;key|=(u8)P42<<6;key|=(u8)P44<<7;
-			P3=0xff;P3&=0xcf;P4=0x00;
+			key = (u8)P35<<5;key |= (u8)P42<<6;key |= (u8)P44<<7;
+			P3=0xff;P35=0;P4=0x00;
 			delay12us();
 			key |= P3 &0x0c;
 			switch(key){
-				case 0x74:key_flag=4;break;
-				case 0x78:key_flag=5;break;
-				case 0xb4:key_flag=8;break;
-				case 0xb8:key_flag=9;break;
-				case 0xd4:key_flag=12;break;
-				case 0xd8:key_flag=13;break;
-				case 0xe4:key_flag=16;break;
-				case 0xe8:key_flag=17;break;
+				case 0x64:key_flag=4;break;
+				case 0x68:key_flag=5;break;
+				case 0xa4:key_flag=8;break;
+				case 0xa8:key_flag=9;break;
+				case 0xc4:key_flag=12;break;
+				case 0xc8:key_flag=13;break;
 			}
 		}
 		return;
@@ -672,6 +776,16 @@ void main(){
 	}	
 }
 /*************************************************
+*函数：T0_it()T0中断函数
+*功能：设置T0计数溢出的情况
+*************************************************/
+void T0_it() interrupt 1 using 1
+{
+	freq_T++;
+	TF0 = 0;
+}
+
+/*************************************************
 *函数：Uart()串口中断处理函数
 *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
 *硬件：使用T2定时器，规定1ms溢出中断一次
@@ -724,6 +838,7 @@ void PCA_isr() interrupt 7 using 3
 		CCAPM0 &= 0xfe;								//关闭中断
 	}
 }
+
 /*************************************************
 *函数：Sysclk_IT()系统定时中断处理函数
 *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
@@ -740,7 +855,7 @@ void Sysclk_IT() interrupt 12 using 3
 		temp_timing--;
 	}else{
 		temp_timing=500;
-		temp_flag=1;
+		temp_sign=1;
 	}
 	//超声波定时读取
 	if(len_timing){
@@ -771,6 +886,30 @@ void Sysclk_IT() interrupt 12 using 3
 		if(write_flag){
 			write_sign = write_flag--;
 		}
+	}
+	if(freq_timing){
+		freq_timing--;
+	}else{
+		freq_timing=1000;
+		count_timing=125;
+		TH0 = 0x00;
+		TL0 = 0x00;
+		TR0 = 1;
+	}
+	if(count_timing){
+		count_timing--;
+	}else{
+		TR0 = 0;
+		((u8 *)&freq_sign)[0] = TL0;
+		((u8 *)&freq_sign)[1] = TH0;
+		freq_H = freq_T;
+		freq_T = 0;
+	}
+	if(time_timing){
+		time_timing--;
+	}else{
+		time_timing = 500;
+		time_sign = 1;
 	}
 	//按键时长计数
 	if(key_count){
