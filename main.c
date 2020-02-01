@@ -37,7 +37,7 @@ u8 bdata led=0,out=0;
 bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0;
 u8 idata dis[8]={0},tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
-u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312;
+u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0;
 u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
 u16 length=0,temp=-2000,len=20,vol=250,bright=250;
 u32 freq=1000;
@@ -614,7 +614,7 @@ void eep_read(){
 void freq_read(){
 	u8 i;
 	
-	freq = (u32)freq_sign *8;
+	freq = ((u32)freq_sign|(u32)freq_H<<8);
 	if(mod_flag == freq_mod){
 		dis[1]=font[freq/1000000%10];
 		dis[2]=font[freq/100000%10];
@@ -626,6 +626,7 @@ void freq_read(){
 		for(i=1;dis[i]==font[0]&&i<8;i++) dis[i]=0xff;
 	}
 	freq_sign = 0;
+	freq_H = 0;
 }
 /*************************************************
 *函数：uart_reply()串口响应函数
@@ -742,10 +743,14 @@ void main(){
 		soft_IT();
 	}	
 }
-
+/*************************************************
+*函数：T0_it()T0中断函数
+*功能：设置T0计数溢出的情况
+*************************************************/
 void T0_it() interrupt 1 using 1
 {
 	freq_T++;
+	TR0 = 0;
 	TF0 = 0;
 }
 
@@ -854,15 +859,20 @@ void Sysclk_IT() interrupt 12 using 3
 	if(freq_timing){
 		freq_timing--;
 	}else{
-		freq_timing=125;
+		freq_timing=5000;
+		count_timing=1000;
+		TH0 = 0x00;
+		TL0 = 0x00;
+		TR0 = 1;
+	}
+	if(count_timing){
+		count_timing--;
+	}else{
 		TR0 = 0;
 		((u8 *)&freq_sign)[0] = TL0;
 		((u8 *)&freq_sign)[1] = TH0;
 		freq_H = freq_T;
 		freq_T = 0;
-		TH0 = 0x00;
-		TL0 = 0x00;
-		TR0 = 1;
 	}
 	//按键时长计数
 	if(key_count){
