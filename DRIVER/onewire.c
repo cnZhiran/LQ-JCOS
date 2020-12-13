@@ -11,7 +11,7 @@ sbit DQ = P1^4;  //单总线接口
 //单总线延时函数
 void Delay_OneWire(unsigned int t)  //STC89C52RC
 {
-	t=t*12;
+	t*=8;
 	while(t--);
 }
 
@@ -60,15 +60,9 @@ bit init_ds18b20(void)
   	DQ = 0;
   	Delay_OneWire(80);
   	DQ = 1;
-  	Delay_OneWire(5); 
+  	Delay_OneWire(10); 
     initflag = DQ;     
-  	Delay_OneWire(10);
+  	Delay_OneWire(5);
   
   	return initflag;
 }
-
-
-
-
-
-
