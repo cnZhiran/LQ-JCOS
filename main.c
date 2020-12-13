@@ -41,6 +41,7 @@ u8 bdata led=0,out=0;
 bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0,time_sign=0;
 u8 idata time[8]={0x00,0x00,0x12,0x01,0x01,0x03,0x20,0x00},dis[8],tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
+u16 idata L1_timing=0,L1_mode=800;
 u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0,time_timing=187;
 u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
 u16 length=0,temp=-2000,len=20,vol=250,bright=250;
@@ -83,7 +84,7 @@ void dis_out();
 
 /*************************************************
 *函数：mod_init()系统模式初始化函数
-*功能：系统模式初始化
+*功能：系统模式初始化		  
 *************************************************/
 void mod_init(){
 	u8 i;
@@ -192,7 +193,7 @@ void PCA_init(){
                                   //PCA定时器停止
                                   //清除CF标志
                                   //清除模块中断标志
-  CL = 0;                         //复位PCA寄存器
+  CL = 0;                         //复位阵列寄存器
   CH = 0;
   CMOD = 0x01;                    //设置PCA时钟源,允许溢出中断
   CCAPM0 = 0x11;                  //PCA模块0为下降沿触发,开启中断。
@@ -372,11 +373,12 @@ void read_temp(){
 	int tp;
 	u8 tl,th,i;
 
-	l1=1;
-	while(init_ds18b20())loop();
+	//while(init_ds18b20())loop();
+	init_ds18b20();
 	Write_DS18B20(0xCC);
 	Write_DS18B20(0x44);
-	while(init_ds18b20())loop();
+	init_ds18b20();
+	//while(init_ds18b20())loop();
 	Write_DS18B20(0xCC);
 	Write_DS18B20(0xBE);
 	tl=Read_DS18B20();
@@ -403,7 +405,6 @@ void read_temp(){
 		}
 	}
 	temp_sign = 0;
-	l1=0;
 }	
 /*************************************************
 *函数：read_len()一次性读距离函数
@@ -483,7 +484,7 @@ void read_len(){
 	u8 i;
 	
 	if(echo_flag){
-		len=length*0.17;
+		len=length *0.017 *10;	//保留1位小数
 		if(mod_flag==len_mod){
 			dis[3]=font[len/10000];
 			dis[4]=font[len/1000%10];
@@ -502,6 +503,8 @@ void read_len(){
 			dis[7]=font[9];
 		}
 	}
+	break_flag = 0;
+	echo_flag = 0;
 }
 #endif
 /*************************************************
@@ -697,7 +700,7 @@ void scankey(){
 	if(P35==0|P42==0|P44==0){
 		if(key_count==0){
 			key_count = 1;
-			key = (u8)P35<<5;key |= (u8)P42<<6;key |= (u8)P44<<7;
+			key = (u8)P35<<5|(u8)P42<<6|(u8)P44<<7;
 			P3=0xff;P35=0;P4=0x00;
 			delay12us();
 			key |= P3 &0x0c;
@@ -910,6 +913,12 @@ void Sysclk_IT() interrupt 12 using 3
 	}else{
 		time_timing = 500;
 		time_sign = 1;
+	}
+	if(L1_timing){
+		L1_timing--;
+	}else if(L1_mode){
+		L1_timing = L1_mode;
+		l1=~l1;
 	}
 	//按键时长计数
 	if(key_count){

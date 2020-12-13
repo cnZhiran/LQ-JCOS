@@ -4,4 +4,3 @@
 "onewire.obj" 
 TO "JCOS" 
 RAMSIZE(256) 
-XDATA( 0X0100-0X07FF )
