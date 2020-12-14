@@ -42,7 +42,7 @@ bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_
 u8 idata time[8]={0x00,0x00,0x12,0x01,0x01,0x03,0x20,0x00},dis[8],tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
 u16 idata L1_timing=0,L1_mode=800;
-u16 idata key_count=0,temp_timing=250,vol_timing=125,len_timing=0,bright_timing=375,delay_timing=0,write_timing=500,freq_timing=312,count_timing=0,time_timing=187;
+u16 idata key_count=0,temp_timing=25,vol_timing=13,len_timing=0,bright_timing=38,delay_timing=0,write_timing=50,freq_timing=31,count_timing=0,time_timing=18;
 u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
 u16 length=0,temp=-2000,len=20,vol=250,bright=250;
 u32 freq=1000;
@@ -702,7 +702,7 @@ void scankey(){
 			key_count = 1;
 			key = (u8)P35<<5|(u8)P42<<6|(u8)P44<<7;
 			P3=0xff;P35=0;P4=0x00;
-			delay12us();
+			//delay12us();
 			key |= P3 &0x0c;
 			switch(key){
 				case 0x64:key_flag=4;break;
@@ -857,35 +857,35 @@ void Sysclk_IT() interrupt 12 using 3
 	if(temp_timing){
 		temp_timing--;
 	}else{
-		temp_timing=500;
+		temp_timing=50;
 		temp_sign=1;
 	}
 	//超声波定时读取
 	if(len_timing){
 		len_timing--;
 	}else{
-		len_timing=1000;
+		len_timing=100;
 		len_flag=1;
 	}
 	//电位器定时读取
 	if(vol_timing){
 		vol_timing--;
 	}else{
-		vol_timing=500;
+		vol_timing=50;
 		vol_flag=1;
 	}
 	//光敏电阻定时读取
 	if(bright_timing){
 		bright_timing--;
 	}else{
-		bright_timing=500;
+		bright_timing=50;
 		bright_flag=1;
 	}
 	//EEPROM写时钟
 	if(write_timing){
 		write_timing--;
 	}else{
-		write_timing=1000;
+		write_timing=100;
 		if(write_flag){
 			write_sign = write_flag--;
 		}
@@ -893,7 +893,7 @@ void Sysclk_IT() interrupt 12 using 3
 	if(freq_timing){
 		freq_timing--;
 	}else{
-		freq_timing=1000;
+		freq_timing=100;
 		count_timing=125;
 		TH0 = 0x00;
 		TL0 = 0x00;
@@ -911,7 +911,7 @@ void Sysclk_IT() interrupt 12 using 3
 	if(time_timing){
 		time_timing--;
 	}else{
-		time_timing = 500;
+		time_timing = 50;
 		time_sign = 1;
 	}
 	if(L1_timing){
