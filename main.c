@@ -38,14 +38,14 @@ u8 code time_read_addr[8]={0x81,0x83,0x85,0x87,0x89,0x8b,0x8d,0x8f};
 u8 code y4=0x80,y5=0xa0,y6=0xc0,y7=0xe0;
 
 u8 bdata led=0,out=0;
-bit temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0,time_sign=0;
+bit smg_sign=0,temp_sign=0,len_flag=0,vol_flag=0,bright_flag=0,break_flag=0,echo_flag=0,tx_flag=0,rx_flag=0,time_sign=0;
 u8 idata time[8]={0x00,0x00,0x12,0x01,0x01,0x03,0x20,0x00},dis[8],tx_buf[16]="init_well\r\n",rx_buf[16]="\0",freq_T=0,freq_H=0;
 u8 idata key_flag=0,key_sign=0,tx_pot=0,rx_pot=0,cnt=0,write_flag=0,write_sign=0,read_flag=0,read_sign=0;
 u16 idata L1_timing=0,L1_mode=800;
 u16 idata key_count=0,temp_timing=25,vol_timing=13,len_timing=0,bright_timing=38,delay_timing=0,write_timing=50,freq_timing=31,count_timing=0,time_timing=18;
 u16 mod_flag=len_mod,read_mod=len_mod,*write_addr,*read_addr,freq_sign=0;
-u16 length=0,temp=-2000,len=20,vol=250,bright=250;
-u32 freq=1000;
+u16 length=0,temp=-2000,len=20,vol=250,bright=250,vout=250;
+u32 freq=10000;
 
 sbit l1=led^0;
 sbit l2=led^1;
@@ -69,6 +69,7 @@ void read_len();
 #endif
 void read_vol();
 void read_bright();
+void write_vol();
 void scankey();
 void send_str();
 void uart_reply();
@@ -226,7 +227,7 @@ void Uart_init(void)		//4800bps@12.000MHz
 void T0init(void)		//100微秒@12.000MHz
 {
 	AUXR &= 0x7F;		//定时器时钟12T模式
-	TMOD |= 0x07;		//设置定时器模式
+	TMOD |= 0x04;		//设置定时器模式
 	TL0 = 0x00;		//设置定时初值
 	TH0 = 0x00;		//设置定时初值
 	TF0 = 0;		//清除TF0标志
@@ -289,9 +290,9 @@ void init(){
 void loop(){
 	scankey();
 	mod_ctrl();
-	dis_smg();
 	dis_led();
 	dis_out();
+	write_vol();
 }
 /*************************************************
 *函数：soft_IT()中断捕获和处理函数
@@ -299,6 +300,7 @@ void loop(){
 *************************************************/
 void soft_IT(){
 	
+	if(smg_sign)dis_smg();
 	if(temp_sign) read_temp();
 	if(vol_flag) read_vol();
 	if(bright_flag) read_bright();
@@ -384,10 +386,10 @@ void read_temp(){
 	tl=Read_DS18B20();
 	th=Read_DS18B20();
 	tp=(th<<8)|tl;
-	temp=tp*6.25;
+	temp=(tp>>2)*25;
 
 	if(mod_flag == temp_mod){
-		if(temp>=0x8000){
+		if(temp&0x8000){
 			dis[3]=font[-temp/10000%10];
 			dis[4]=font[-temp/1000%10];
 			dis[5]=font[-temp/100%10]&0x7f;
@@ -517,7 +519,7 @@ void read_vol(){
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
-	IIC_SendByte(0x03);
+	IIC_SendByte(0x43);
 	IIC_WaitAck();
 	IIC_Start();
 	IIC_SendByte(0x91);
@@ -525,7 +527,8 @@ void read_vol(){
 	IIC_RecByte();
 	IIC_SendAck(0);
 	vol=IIC_RecByte();
-	vol=vol*500.0/255;
+	vol=vol*(500.0/255);
+	IIC_SendAck(1);
 	IIC_Stop();
 
 	if(mod_flag==vol_mod){
@@ -541,24 +544,43 @@ void read_vol(){
 	l3=0;
 }
 /*************************************************
+*函数：write_vol()读电位器函数
+*功能：读取电位器电压
+*************************************************/
+void write_vol() {
+	u8 d = vout*(256/500.0);		//(256/500)约为0.5，用vout/2可避免浮点运算，但有误差 
+
+	IIC_Start();
+	IIC_SendByte(0x90);		//器件地址，写操作
+	IIC_WaitAck();
+	IIC_SendByte(0x40);		//设置允许模拟输出，输入通道随意
+	IIC_WaitAck();
+	IIC_SendByte(d);		//设置输出值
+	IIC_WaitAck();
+	IIC_Stop();
+}
+/*************************************************
 *函数：read_bright()读亮度函数
 *功能：读取光敏电阻电压
 *************************************************/
 void read_bright(){
+	u8 d;
+
 	l4=1;
 	bright_flag = 0;
 	IIC_Start();
 	IIC_SendByte(0x90);
 	IIC_WaitAck();
-	IIC_SendByte(0x01);
+	IIC_SendByte(0x41);
 	IIC_WaitAck();
 	IIC_Start();
 	IIC_SendByte(0x91);
 	IIC_WaitAck();
 	IIC_RecByte();
 	IIC_SendAck(0);
-	bright=IIC_RecByte();
-	bright=bright*500.0/255;
+	d=IIC_RecByte();
+	bright=d*(500.0/255);
+	IIC_SendAck(1);
 	IIC_Stop();
 
 	if(mod_flag==bright_mod){
@@ -743,6 +765,7 @@ void dis_smg(){
 		delay100us();
 		P0=0xff;
 	}
+	smg_sign = 0;
 }
 /*************************************************
 *函数：dis_led()LED显示函数
@@ -785,7 +808,6 @@ void main(){
 void T0_it() interrupt 1 using 1
 {
 	freq_T++;
-	TF0 = 0;
 }
 
 /*************************************************
@@ -796,22 +818,22 @@ void T0_it() interrupt 1 using 1
 void Uart() interrupt 4	using 2
 {
     if (RI){
-			RI = 0;                 //清除RI位
-			rx_buf[rx_pot] = SBUF;//存串口数据
-			if(rx_buf[rx_pot]=='?'){
-				rx_pot = 0;
-			}else if(rx_buf[rx_pot]=='\n'){
-				rx_buf[++rx_pot] ='\0';
-				rx_flag = 1;
-				rx_pot = 0; 	
-			}else{
-				if(++rx_pot>=15) rx_pot = 0;
-			}
+		RI = 0;                 //清除RI位
+		rx_buf[rx_pot] = SBUF;//存串口数据
+		if(rx_buf[rx_pot]=='?'){
+			rx_pot = 0;
+		}else if(rx_buf[rx_pot]=='\n'){
+			rx_buf[++rx_pot] ='\0';
+			rx_flag = 1;
+			rx_pot = 0; 	
+		}else{
+			if(++rx_pot>=15) rx_pot = 0;
+		}
     }
     if (TI){
-			TI = 0;                 //清除TI位
-			if(tx_buf[tx_pot]){
-    		SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
+		TI = 0;                 //清除TI位
+		if(tx_buf[tx_pot]){
+			SBUF = tx_buf[tx_pot];                 //写数据到UART数据寄存器
 			if(++tx_pot>=15) tx_pot=0;
 		}else{
 			tx_pot = 0;
@@ -841,7 +863,6 @@ void PCA_isr() interrupt 7 using 3
 		CCAPM0 &= 0xfe;								//关闭中断
 	}
 }
-
 /*************************************************
 *函数：Sysclk_IT()系统定时中断处理函数
 *功能：软件中断标志的定时置位服务，毫秒级的计时计数服务
@@ -853,6 +874,8 @@ void Sysclk_IT() interrupt 12 using 3
 	if(delay_timing){
 		delay_timing--;
 	}
+	//数码管定时刷新
+	smg_sign = 1;
 	//18B20定时读取
 	if(temp_timing){
 		temp_timing--;
@@ -893,7 +916,7 @@ void Sysclk_IT() interrupt 12 using 3
 	if(freq_timing){
 		freq_timing--;
 	}else{
-		freq_timing=100;
+		freq_timing=500;
 		count_timing=125;
 		TH0 = 0x00;
 		TL0 = 0x00;
@@ -903,8 +926,8 @@ void Sysclk_IT() interrupt 12 using 3
 		count_timing--;
 	}else{
 		TR0 = 0;
-		((u8 *)&freq_sign)[0] = TL0;
-		((u8 *)&freq_sign)[1] = TH0;
+		((u8 *)&freq_sign)[0] = TH0;
+		((u8 *)&freq_sign)[1] = TL0;
 		freq_H = freq_T;
 		freq_T = 0;
 	}
